@@ -17,7 +17,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 | `lionkit` library: http, keychain, ghost, spotify, markdown, html2md, cocoa, icons | — | works |
 | Planchette (Ghost blog editor) | 0.3 | in user testing |
 | Kassett (Spotify Connect remote) | 0.2 | in user testing; cassette redesign mocked up |
-| Latchkey (WPA2/WPA3 transition networks) | 0.1 | menu bar app built (demo-verified), not yet tried on a real network |
+| Latchkey (WPA2/WPA3 transition networks) | 0.1 | in daily use on the Mac: joined ZipZap with its saved password, opens at login |
 | Dev tooling: deploy, launch (GUI session), shot, build_lionkit | — | works |
 
 ## Milestones
@@ -245,7 +245,7 @@ Remaining:
 
 Done (0.1, see `system/Latchkey/README.md`): the menu bar app with a key-shaped status glyph
 (signal, joining animation, off), a Lion-style network menu, a join dialog modelled on Lion's
-own, rejoin with back-off, passwords in the login keychain, Open at Login, Forget and "Rejoin Now".
+own, rejoin with back-off, passwords in the login keychain, Open at Login and Forget.
 A brass-key app icon. Demo mode with made-up networks
 for screenshots. `tools/deploy.sh` now builds `system/*` apps, and `tools/build_app.py` accepts
 extra Info.plist keys (`"info"` in app.json, used for `LSUIElement`).
@@ -257,7 +257,6 @@ glyph in the menu bar, and the rejoin loop up to a failed join. The app is insta
 Next:
 - Nobody has opened the real menu yet. An open menu can't be captured over SSH, so the user
   needs to click it once (check row highlight, the scan on open, and how the menu resizes).
-- Joining for real is untested: the real scan and the join run only when the user acts.
 - "Open at Login" is untested (it adds a real login item). Reading the list works.
 
 ---

@@ -779,10 +779,6 @@ class Latchkey(NSObject):
 
         if self.failure and self.failure[0] in names and s.power:
             self.add(m, u"Enter Password for %s…" % q(self.failure[0]), "enterPassword:", self.failure[0])
-        if s.ssid and s.ssid in names:
-            item = self.add(m, u"Rejoin %s Now" % q(s.ssid), "rejoinNow:", s.ssid)
-            item.setEnabled_(not self.phase)
-            item.setToolTip_(u"Disconnects for a moment and rejoins with the saved password.")
         self.add(m, u"Join Other Network…", "joinOther:").setEnabled_(bool(s.present and s.power))
         if names:
             forget = NSMenu.alloc().initWithTitle_(u"Forget Network")
@@ -885,10 +881,6 @@ class Latchkey(NSObject):
 
     def joinOther_(self, sender):
         self.openPanel("other", None, None)
-
-    def rejoinNow_(self, sender):
-        if not self.phase:
-            self.join(sender.representedObject(), None, True, None)
 
     def forget_(self, sender):
         ssid = sender.representedObject()
