@@ -729,6 +729,11 @@ class ToolbarLCDView(LibraryFlipped):
         for r, _ in self.hits:
             self.addCursorRect_cursor_(r, NSCursor.pointingHandCursor())
 
+    def mouseDownCanMoveWindow(self):
+        # The library is a textured window: without this a click here also starts dragging it, and the
+        # window being dragged comes to the front, over the player the click just brought up.
+        return False
+
     def drawRect_(self, rect):
         b = NSMakeRect(0.5, 0.5, self.bounds().size.width - 1, self.bounds().size.height - 2)
         if getattr(self, "glass", None) is None:       # the LCD's glass, drawn once

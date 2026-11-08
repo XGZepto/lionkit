@@ -1257,9 +1257,6 @@ class MiniView(FlippedView):
     def isOpaque(self):
         return True
 
-    def mouseDownCanMoveWindow(self):
-        return True
-
     def hits(self):
         links = getattr(self, "links", None)
         if not links:
@@ -1273,6 +1270,12 @@ class MiniView(FlippedView):
     def resetCursorRects(self):
         for r, _ in self.hits():
             self.addCursorRect_cursor_(r, NSCursor.pointingHandCursor())
+
+    def mouseDownCanMoveWindow(self):
+        """Drag the mini player by its body, but not by the title or artist links: a drag brings
+        the mini player to the front, over the library the link just opened."""
+        p = self.convertPoint_fromView_(self.window().mouseLocationOutsideOfEventStream(), None)
+        return not any(NSPointInRect(p, r) for r, _ in self.hits())
 
     def mouseDown_(self, event):
         p = point_at(self, event)
