@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """Planchette: a Lion-native Markdown editor for blogs that run on Ghost.
 
-Post list with sorting and search, two-way sync with conflict detection, a status header,
-a HUD inspector for slug / excerpt / tags / feature image, Markdown syntax highlighting,
-and a live preview that scrolls with the editor.
+Post list with sorting and search, two-way sync with conflict detection, scheduling, a HUD
+inspector for slug / publish date / excerpt / tags / feature image, Markdown syntax highlighting,
+images by drag and drop or paste, the find bar, Lion full screen, and a live preview that
+scrolls with the editor.
 """
-from __future__ import print_function
-
 import calendar
 import glob
 import hashlib
@@ -48,7 +47,6 @@ SCHEDULE_LEAD = 5 * 60  # the site wants a scheduled time a few minutes ahead; a
 # Lion API that PyObjC 2.3's metadata (from Snow Leopard) doesn't know by name.
 FULL_SCREEN_PRIMARY = 1 << 7    # NSWindowCollectionBehaviorFullScreenPrimary
 AUTO_HIDE_TOOLBAR = 1 << 11     # NSApplicationPresentationAutoHideToolbar
-FULL_SCREEN_MASK = 1 << 14      # NSFullScreenWindowMask
 SHOW_REPLACE = 12               # NSTextFinderActionShowReplaceInterface
 
 
@@ -234,9 +232,9 @@ def pasteboard_images(pb):
     """('files', [paths]) for image files, ('data', (data, type)) for raw image data, or None.
     Raw data only counts when there's no text: copying from Pages or a web page also puts a
     picture of the selection on the pasteboard."""
-    types = pb.types() or []
+    types = pb.types()
     if NSFilenamesPboardType in types:
-        paths = [p for p in (pb.propertyListForType_(NSFilenamesPboardType) or [])
+        paths = [p for p in pb.propertyListForType_(NSFilenamesPboardType)
                  if os.path.splitext(p)[1][1:].lower() in IMAGE_TYPES]
         return ("files", paths) if paths else None
     if NSStringPboardType in types:
@@ -462,7 +460,7 @@ class FeatureWell(NSView):
         if self.picture:
             inner = NSInsetRect(frame, 3, 3)
             size = self.picture.size()
-            scale = max(inner.size.width / max(size.width, 1), inner.size.height / max(size.height, 1))
+            scale = max(inner.size.width / size.width, inner.size.height / size.height)
             w, h = size.width * scale, size.height * scale
             NSGraphicsContext.saveGraphicsState()
             NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(inner, 3, 3).addClip()
@@ -637,7 +635,6 @@ class AppDelegate(NSObject):
         self.preview_ready = False
         self.fetching_images = set()
         self.shrinking = set()
-        self.kept_place = None
         self.search = u""
         cocoa.build_main_menu(
             APP_NAME, self,
@@ -667,6 +664,8 @@ class AppDelegate(NSObject):
         full.setKeyEquivalentModifierMask_(NSCommandKeyMask | NSControlKeyMask)
 
         self.focus = False
+        self.restoring, self.laying_out = True, False
+        self.kept_place = self.pending_actions = self.shown_preview = None
         self.buildWindow()
         self.buildInspector()
         self.outer.subviews()[0].setHidden_(self.defaults.boolForKey_("postListHidden"))
@@ -712,106 +711,45 @@ class AppDelegate(NSObject):
             edit.addItemWithTitle_action_keyEquivalent_(title, None, "").setSubmenu_(sub)
 
     def runDebugActions_(self, _):
-        """For checking states that need a click, over SSH: `defaults write page.zepto.planchette
-        DebugActions -array inspector 'title: more words'` runs them once, two seconds after launch."""
-        actions = getattr(self, "pending_actions", None) or list(self.defaults.arrayForKey_("DebugActions") or [])
+        """Checks states that need a click, over SSH: `defaults write page.zepto.planchette DebugActions
+        -array 'open: <post id>' inspector 'snapshot: /tmp/a.png'` runs them once after launch.
+        Snapshots read the window's backing store, so they work while the screen is locked."""
+        actions = self.pending_actions or list(self.defaults.arrayForKey_("DebugActions"))
         self.pending_actions = None
         self.defaults.removeObjectForKey_("DebugActions")
         for i, action in enumerate(actions):
             name, _, arg = unicode(action).partition(u":")
             arg = arg.strip()
-            if name == "wait":  # let async work (pulls, image fetches) finish first
+            if name == "wait":  # for pulls and image downloads
                 self.pending_actions = actions[i + 1:]
-                self.performSelector_withObject_afterDelay_("runDebugActions:", None, float(arg or 2))
+                self.performSelector_withObject_afterDelay_("runDebugActions:", None, float(arg))
                 return
-            elif name in ("snapshot", "snapshot-inspector"):  # works while the screen is locked
+            if name in ("snapshot", "snapshot-inspector"):
                 window = self.inspector if name == "snapshot-inspector" else self.window
                 frame_view = window.contentView().superview()
                 window.displayIfNeeded()
-                frame_view.lockFocus()  # what's on the window's backing store, subviews and all
+                frame_view.lockFocus()
                 rep = NSBitmapImageRep.alloc().initWithFocusedViewRect_(frame_view.bounds())
                 frame_view.unlockFocus()
                 rep.representationUsingType_properties_(NSPNGFileType, None).writeToFile_atomically_(arg, True)
-            elif name == "dump":
-                for label, view in (("strip", self.strip), ("title", self.titleField), ("rule", self.rule),
-                                    ("text", self.textView), ("clip", self.editorScroll.contentView())):
-                    print(label, view.frame(), view.isHidden(), view.superview().__class__.__name__,
-                          view.isFlipped(), view.visibleRect())
-                print("title", repr(self.titleField.stringValue()), "inset", self.textView.textContainerInset())
-                sys.stdout.flush()
-            elif name == "roundtrip":  # read-only: every post's HTML, for checking html2md on real posts
-                g = self.ghostClient(False)
-
-                def fetch(g=g, path=arg):
-                    posts = [g.get_post(p["id"], html=True) for p in g.list_posts()]
-                    with open(path, "w") as f:
-                        json.dump([{"id": p["id"], "status": p["status"], "html": p.get("html") or u""}
-                                   for p in posts], f)
-                    return len(posts)
-
-                cocoa.in_background(fetch, lambda n, e: (print("roundtrip", n, e), sys.stdout.flush()))
-            elif name in ("save-test", "schedule-test", "reschedule-test", "unschedule-test", "delete-test", "state"):
-                d = self.doc or {}
-                if name == "state":
-                    print("state", repr((d.get("id"), d.get("status"), d.get("published_at"), d.get("dirty"),
-                                         d.get("title"), self.secondaryButton.title())))
-                    sys.stdout.flush()
-                    continue
-                if not (d.get("title") or u"").startswith(u"Planchette test") or d.get("status") == "published":
-                    print("refusing", name, "on", repr((d.get("title"), d.get("status"))))
-                    sys.stdout.flush()
-                    return
-                if name == "save-test":
-                    self.push(None, False, False)
-                elif name in ("schedule-test", "reschedule-test"):
-                    was_dirty = d.get("dirty")
-                    d["publish_later"], d["published_at"] = True, arg
-                    if name == "schedule-test":
-                        save_doc(d)
-                        self.push("scheduled", False, True)
-                    else:
-                        self.markDirty(was_dirty)
-                        self.push(None, False, False)
-                elif name == "unschedule-test":
-                    self.push("draft", False, True)
-                elif name == "delete-test" and d.get("id"):
-                    g, post_id = self.ghostClient(False), d["id"]
-
-                    def gone(_, error, post_id=post_id):
-                        print("deleted", repr((post_id, error)))
-                        sys.stdout.flush()
-                        if not error:
-                            os.remove(doc_path(post_id))
-                            self.showDoc(next((d for d in local_docs().values() if not d.get("id")), None) or
-                                         self.createDoc())
-                            self.refresh_(None)
-
-                    cocoa.in_background(lambda: g.delete_post(post_id), gone)
-            elif name == "check":  # what the site itself says about the open post (read-only)
-                g, post_id = self.ghostClient(False), (self.doc or {}).get("id")
-                if post_id:
-                    cocoa.in_background(lambda: g.get_post(post_id),
-                                        lambda p, e: (print("site", repr((p and p["status"], p and p.get("published_at"),
-                                                                 p and p.get("email"), e))), sys.stdout.flush()))
-            elif name == "scrollto":
+            elif name == "open":
+                self.openKey(arg)
+            elif name == "scrollto":  # the line holding this text goes to the top; empty for the title
                 self.scrollToCharacter(max(0, self.textView.string().find(arg)))
-            elif name == "frame":
-                self.window.setFrame_display_(NSMakeRect(*[float(x) for x in arg.split(",")]), True)
-            elif name == "reveal":
-                found = self.textView.string().find(arg)
-                if found >= 0:
-                    self.textView.scrollRangeToVisible_(NSMakeRange(found, len(arg)))
-            elif name == "top":
-                clip = self.editorScroll.contentView()
-                clip.scrollToPoint_(NSMakePoint(0, 0))
-                self.editorScroll.reflectScrolledClipView_(clip)
             elif name == "inspector":
-                self.inspector.setHidesOnDeactivate_(False)  # it would hide while we're in the background
+                self.inspector.setHidesOnDeactivate_(False)  # the app is in the background
                 self.toggleInspector_(None)
             elif name == "preview":
                 self.togglePreview_(None)
-            elif name == "open":
-                self.openKey(arg)
+            elif name == "find":
+                item = NSMenuItem.alloc().init()
+                item.setTag_(SHOW_REPLACE if arg == "replace" else NSFindPanelActionShowFindPanel)
+                self.window.makeFirstResponder_(self.textView)
+                self.textView.performFindPanelAction_(item)
+            elif name == "focus":  # full screen's layout, without switching Spaces
+                self.keepPlace()
+                self.setFocusMode(arg != "off")
+                self.afterWidthChange()
             elif name == "size":
                 w, h = [float(x) for x in arg.split(",")]
                 frame = self.window.frame()
@@ -819,47 +757,6 @@ class AppDelegate(NSObject):
                 self.window.setFrame_display_(NSMakeRect(frame.origin.x, frame.origin.y + frame.size.height - h,
                                                          w, h), True)
                 self.afterWidthChange()
-            elif name == "title":
-                self.window.makeFirstResponder_(self.titleField)
-                editor = self.titleField.currentEditor()
-                editor.setSelectedRange_(NSMakeRange(len(editor.string()), 0))
-                editor.insertText_(arg)
-            elif name == "new":
-                self.newPost_(None)
-            elif name == "type":
-                self.window.makeFirstResponder_(self.textView)
-                self.textView.insertText_(arg.replace(u"\\n", u"\n"))
-            elif name in ("paste-file", "paste-png"):  # a private pasteboard, never the user's clipboard
-                pb = NSPasteboard.pasteboardWithUniqueName()
-                if name == "paste-file":
-                    pb.declareTypes_owner_([NSFilenamesPboardType, NSStringPboardType], None)
-                    pb.setPropertyList_forType_([arg], NSFilenamesPboardType)
-                    pb.setString_forType_(os.path.basename(arg), NSStringPboardType)
-                else:
-                    pb.declareTypes_owner_([NSPasteboardTypeTIFF], None)
-                    pb.setData_forType_(NSImage.alloc().initWithContentsOfFile_(arg).TIFFRepresentation(),
-                                        NSPasteboardTypeTIFF)
-                found = pasteboard_images(pb)
-                print("debug %s found %s" % (name, repr(found)[:200]))
-                if found:
-                    self.insertImages_(found)
-                pb.releaseGlobally()
-            elif name == "feature":
-                self.setFeature(import_media(arg))
-            elif name == "later":
-                self.laterBox.setState_(NSOffState if self.laterBox.state() == NSOnState else NSOnState)
-                self.toggleLater_(self.laterBox)
-            elif name == "find":
-                item = NSMenuItem.alloc().init()
-                item.setTag_(SHOW_REPLACE if arg == "replace" else NSFindPanelActionShowFindPanel)
-                self.window.makeFirstResponder_(self.textView)
-                self.textView.performFindPanelAction_(item)
-            elif name == "focus":  # what full screen does to the layout, without switching Spaces
-                self.keepPlace()
-                self.setFocusMode(arg != "off")
-                self.afterWidthChange()
-            elif name == "postlist":
-                self.togglePostList_(None)
 
     # ---- window ------------------------------------------------------------------------------------
     def buildWindow(self):
@@ -1053,7 +950,7 @@ class AppDelegate(NSObject):
     def splitViewDidResizeSubviews_(self, note):
         """Remember where the user put the dividers (not while we lay them out ourselves)."""
         split = note.object()
-        if getattr(self, "restoring", True) or self.focus or not self.window.isVisible():
+        if self.restoring or self.focus or not self.window.isVisible():
             return
         if split == self.outer:
             sidebar = split.subviews()[0]
@@ -1105,7 +1002,7 @@ class AppDelegate(NSObject):
         """Keep the text in a centered column of readable width. The status line, title and rule sit
         at the top of the text view (flipped coordinates) and scroll with the text; the title gets as
         many lines as it needs and the text starts below it."""
-        if getattr(self, "laying_out", False):
+        if self.laying_out:
             return  # resizing the scroll view below re-posts the clip view's frame notification
         self.laying_out = True
         width = self.editorPane.frame().size.width
@@ -1502,8 +1399,7 @@ class AppDelegate(NSObject):
         self.renameRow()
 
     def renameRow(self):
-        """The post list shows the title as it's typed (rebuildSidebar only runs when a post first
-        gets unsaved changes, and new posts start out with them)."""
+        """The post list follows the title as it's typed."""
         for _, items in self.groups:
             for item in items:
                 if item["key"] == self.doc["key"]:
@@ -1596,7 +1492,7 @@ class AppDelegate(NSObject):
             def done(_, error, path=path):
                 self.shrinking.discard(path)
                 self.updatePreview_(None)
-                if self.doc and self.doc.get("feature_image") and self.imageURL(self.doc["feature_image"]).startswith("file:"):
+                if self.doc.get("feature_image"):
                     self.loadInspector()
 
             cocoa.in_background(lambda: make_shown_copy(path), done)
@@ -1613,7 +1509,7 @@ class AppDelegate(NSObject):
         meta = u" · ".join(x for x in (when, u", ".join(d.get("tags") or [])) if x)
         feature = self.imageURL(d["feature_image"]) if d.get("feature_image") else u""
         content = (d.get("title") or u"Untitled", meta, feature, body)
-        if content == getattr(self, "shown_preview", None):  # replacing the page re-lays out every picture
+        if content == self.shown_preview:  # replacing the page re-lays out every picture
             self.preview.stringByEvaluatingJavaScriptFromString_(u"scrollToRatio(%f);" % self.editorScrollRatio())
             return
         self.shown_preview = content
@@ -1676,16 +1572,15 @@ class AppDelegate(NSObject):
             lm = tv.layoutManager()
             lm.ensureLayoutForTextContainer_(tv.textContainer())  # all of it, or the scroll gets clamped
             tv.sizeToFit()
-            line = lm.lineFragmentRectForGlyphAtIndex_effectiveRange_(lm.glyphIndexForCharacterAtIndex_(min(top, length - 1)), None)
-            line = line[0] if isinstance(line, tuple) else line
+            line = lm.lineFragmentRectForGlyphAtIndex_effectiveRange_(
+                lm.glyphIndexForCharacterAtIndex_(min(top, length - 1)), None)[0]
             y = line.origin.y + tv.textContainerOrigin().y
         clip.scrollToPoint_(clip.constrainScrollPoint_(NSMakePoint(0, y)))
         self.editorScroll.reflectScrolledClipView_(clip)
 
-    # When the editor gets wider or narrower, NSTextView keeps its first visible character at the
-    # top while it re-wraps. The title sits above the text inside the scroll view, so at the top of
-    # a post that scrolled the title out of view (and full screen showed stale pixels until a
-    # scroll). So: note what's at the top before a width change, and go back to it afterwards.
+    # NSTextView keeps its first visible character at the top while it re-wraps for a new width,
+    # which would scroll the title (above the text, in the same scroll view) out of view. Width
+    # changes note what's at the top first and go back to it afterwards.
     def keepPlace(self):
         """Call before a width change."""
         if self.kept_place is None:
@@ -1738,9 +1633,8 @@ class AppDelegate(NSObject):
 
     # ---- inspector (HUD panel) -------------------------------------------------------------------------
     def buildInspector(self):
-        lift = 0 if self.schedulingEnabled() else 88  # no Publish Date section without scheduling
         p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 300, 588 - lift),
+            NSMakeRect(0, 0, 300, 588),
             NSTitledWindowMask | NSClosableWindowMask | NSUtilityWindowMask | NSHUDWindowMask,
             NSBackingStoreBuffered, False)
         p.setTitle_(u"Post Info")
@@ -1750,17 +1644,17 @@ class AppDelegate(NSObject):
         v = p.contentView()
         gray = NSColor.colorWithCalibratedWhite_alpha_(0.6, 1)
 
-        hud_label(v, u"URL SLUG", NSMakeRect(14, 560 - lift, 270, 15))
-        self.slugField = NSTextField.alloc().initWithFrame_(NSMakeRect(16, 534 - lift, 268, 22))
+        hud_label(v, u"URL SLUG", NSMakeRect(14, 560, 270, 15))
+        self.slugField = NSTextField.alloc().initWithFrame_(NSMakeRect(16, 534, 268, 22))
         self.slugField.cell().setPlaceholderString_(u"generated from the title")
         self.slugField.setDelegate_(self)
         v.addSubview_(self.slugField)
-        self.urlLabel = hud_label(v, u"", NSMakeRect(14, 513 - lift, 218, 15), 10.5, gray)
+        self.urlLabel = hud_label(v, u"", NSMakeRect(14, 513, 218, 15), 10.5, gray)
         self.urlLabel.cell().setLineBreakMode_(NSLineBreakByTruncatingMiddle)
-        self.copyButton = hud_button(v, u"Copy", NSMakeRect(238, 511 - lift, 46, 19), self, "copyURL:")
+        self.copyButton = hud_button(v, u"Copy", NSMakeRect(238, 511, 46, 19), self, "copyURL:")
         self.copyButton.setToolTip_(u"Copy the post\u2019s address")
 
-        publish_label = hud_label(v, u"PUBLISH DATE", NSMakeRect(14, 484, 270, 15))
+        hud_label(v, u"PUBLISH DATE", NSMakeRect(14, 484, 270, 15))
         self.laterBox = hud_checkbox(v, u"Publish later:", NSMakeRect(14, 459, 112, 18), self, "toggleLater:")
         self.dateCaption = hud_label(v, u"", NSMakeRect(14, 460, 110, 15), 11, NSColor.colorWithCalibratedWhite_alpha_(0.9, 1))
         picker = NSDatePicker.alloc().initWithFrame_(NSMakeRect(128, 457, 156, 22))
@@ -1775,8 +1669,6 @@ class AppDelegate(NSObject):
         self.datePicker = picker
         self.dateHint = hud_label(v, u"", NSMakeRect(14, 421, 272, 30), 10.5, gray)
         self.dateHint.cell().setWraps_(True)
-        for view in (publish_label, self.laterBox, self.dateCaption, picker, self.dateHint):
-            view.setHidden_(bool(lift))
 
         hud_label(v, u"TAGS", NSMakeRect(14, 395, 270, 15))
         tags = NSTokenField.alloc().initWithFrame_(NSMakeRect(16, 347, 268, 44))
@@ -1837,7 +1729,7 @@ class AppDelegate(NSObject):
         if d.get("status") == "published" and d.get("url"):
             return d["url"]
         guess = re.sub(r"[^a-z0-9]+", u"-", (d.get("title") or u"").lower()).strip(u"-")  # roughly what the site makes
-        return u"%s/%s/" % (self.site().rstrip(u"/") or u"https://your-blog", d.get("slug") or guess or u"\u2026")
+        return u"%s/%s/" % (self.site().rstrip(u"/"), d.get("slug") or guess or u"\u2026")
 
     def updateInspectorLabels(self):
         d = self.doc
@@ -1854,32 +1746,21 @@ class AppDelegate(NSObject):
         self.setStatus_(u"Copied %s" % self.postURL())
 
     # ---- publish date: scheduling drafts, moving scheduled and published posts -----------------------
-    def schedulingEnabled(self):
-        """On unless turned off with `defaults write page.zepto.planchette EnableScheduling -bool NO`.
-        Tried against a real site on 2026-11-08: draft, schedule, move, unschedule, delete."""
-        return self.defaults.objectForKey_("EnableScheduling") is None or self.defaults.boolForKey_("EnableScheduling")
-
     def loadPublishDate(self):
         d = self.doc
         status = d.get("status") or "new"
         live = status in ("scheduled", "published")
-        if not self.schedulingEnabled():
-            d["publish_later"] = False
-            return  # the section isn't shown; the status line above the title has the date
-        if live and not d.get("published_at"):  # copies pulled before 0.4 didn't keep the date
-            d["published_at"] = (self.remoteSummary(d.get("id")) or {}).get("published_at")
         seconds = iso_seconds(d.get("published_at"))
         if seconds is None:  # suggest tomorrow morning
             t = time.localtime(time.time() + 86400)
             seconds = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 9, 0, 0, 0, 0, -1))
         self.laterBox.setHidden_(live)
-        self.datePicker.setHidden_(False)
         self.laterBox.setState_(NSOnState if d.get("publish_later") else NSOffState)
         self.dateCaption.setHidden_(not live)
         self.dateCaption.setStringValue_(u"Goes live:" if status == "scheduled" else u"Published:")
         self.datePicker.setMinDate_(None if status == "published" else NSDate.dateWithTimeIntervalSinceNow_(SCHEDULE_LEAD))
         self.datePicker.setDateValue_(NSDate.dateWithTimeIntervalSince1970_(seconds))
-        self.datePicker.setEnabled_((live or bool(d.get("publish_later"))) and self.schedulingEnabled())
+        self.datePicker.setEnabled_(live or bool(d.get("publish_later")))
         self.dateHint.setStringValue_({
             "scheduled": u"Your site publishes it at this time, even if this Mac is asleep. Unschedule\u2026 makes it a draft again.",
             "published": u"Changing the date moves the post in your site\u2019s timeline; Update saves it.",
@@ -1960,7 +1841,7 @@ class AppDelegate(NSObject):
     def pickImage(self, multiple):
         panel = NSOpenPanel.openPanel()
         panel.setAllowsMultipleSelection_(multiple)
-        panel.setAllowedFileTypes_(["jpg", "jpeg", "png", "gif", "webp"])
+        panel.setAllowedFileTypes_(list(IMAGE_TYPES))
         pb = os.path.expanduser("~/Pictures/Photo Booth Library/Pictures")
         if os.path.isdir(pb):
             panel.setDirectoryURL_(NSURL.fileURLWithPath_(pb))
@@ -2024,10 +1905,6 @@ class AppDelegate(NSObject):
                 return
             self.remote, self.site_tags = result
             self.rebuildSidebar()
-            if self.doc and self.doc.get("id"):
-                self.loadPublishDate()  # also fills in a publish date that older copies didn't keep
-                self.updateState()
-                self.updatePreview_(None)
             if self.doc and self.doc.get("id") and not self.doc.get("dirty"):
                 summary = self.remoteSummary(self.doc["id"])
                 if summary and (summary["updated_at"] != self.doc.get("base_updated_at") or
@@ -2117,7 +1994,6 @@ class AppDelegate(NSObject):
         if not g:
             return
         snapshot = json.loads(json.dumps(doc))
-        send_date = self.schedulingEnabled()  # until scheduling is switched on, saving works as in 0.3
         self.setBusy_(u"Saving to %s…" % self.siteName())
 
         def upload(src, uploads):
@@ -2145,7 +2021,7 @@ class AppDelegate(NSObject):
             fields["feature_image"] = upload(feature, uploads) if feature and media_path(feature) else feature
             if status:
                 fields["status"] = status
-            if send_date and snapshot.get("published_at") and (status == "scheduled" or (
+            if snapshot.get("published_at") and (status == "scheduled" or (
                     status is None and snapshot.get("status") in ("scheduled", "published"))):
                 fields["published_at"] = snapshot["published_at"]
             if not snapshot.get("id"):

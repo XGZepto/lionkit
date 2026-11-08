@@ -20,7 +20,7 @@ VERSION = 4
 GENERATED = {"img": ("loading", "srcset", "sizes"), "h1": ("id",), "h2": ("id",), "h3": ("id",),
              "h4": ("id",), "h5": ("id",), "h6": ("id",)}
 BREAK = u"\x01"
-INLINE = {"strong", "b", "em", "i", "a", "span", "code", "s", "u", "mark", "sup", "sub"}
+INLINE = {"strong", "b", "em", "i", "a", "span", "s", "u", "mark", "sup", "sub"}  # not code: its spaces show
 
 VOID = {"img", "br", "hr", "meta", "input", "source", "link", "col", "area", "wbr", "embed", "param"}
 HTML_CARD = re.compile(r"(<!--kg-card-begin: html-->.*?<!--kg-card-end: html-->)", re.S)
@@ -180,7 +180,7 @@ def _canon(node):
     for child in node.children:
         if isinstance(child, Node) and child.tag == "span" and child.attrs == {"style": "white-space: pre-wrap;"}:
             kids.extend(_canon(c) for c in child.children)
-        elif isinstance(child, Node) and child.tag in INLINE and child.tag != "code":
+        elif isinstance(child, Node) and child.tag in INLINE:
             text = text_of(child)
             kids.extend([u" "] if text[:1].isspace() else [])
             kids.append(_canon(child))

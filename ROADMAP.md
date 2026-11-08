@@ -100,40 +100,20 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** done (the user approved shipping 0.4 on 2026-11-08) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** done · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
-Done and checked on the Mac (screenshots, or the app's own snapshot while the screen was locked):
-- The status line, title and rule scroll with the text, so a long title never hides the first line
-  and no fixed edge sits over the writing. Restoring a post's place lays out the whole post first.
-- Quieter status: no dots or counts in the post list, no pill above the title (one line instead,
-  e.g. "Published November 8, 2026"), and the preview shows the date and tags a reader sees.
-- Round-trip safety: every block is converted, rendered back and compared (`html2md.same_html`);
-  anything that wouldn't come back the same stays as an HTML card. On all 12 posts on the site the
-  result is identical, with 2 blocks kept as cards. Line breaks (backslash at line end) and
-  Ghost-style quotes are supported; image widths and heights are kept per post and sent on save.
-  `html2md.VERSION` is 3, so clean copies re-pull.
-- Find bar (⌘F, ⌥⌘F with Replace), the focus layout used in full screen, image paste (files and
-  pictures), the inspector (address with Copy, feature image well that takes drops).
+0.4 adds Lion full screen (the post list steps aside, the toolbar auto-hides), the find bar,
+images by drag and drop or paste, scheduling and moving publish dates from the inspector, a post
+address with Copy, a feature-image well that crops like a post card, remembered panes and per-post
+scroll positions, and a header that scrolls with the text. The post list and status line say a
+post's state once, through its group and one plain line.
 
-- The user dragged a Photo Booth picture from Finder into a local draft: it was imported and shown.
-- Scheduling, tested on the real site with the user's go-ahead on 2026-11-08 using throwaway drafts
-  (draft → scheduled for 2031 → moved → unscheduled → deleted; the site reported no email and
-  nothing was published). It is on by default; `EnableScheduling -bool NO` hides it.
-- Even line spacing for Chinese text (fixed body line height); far-off dates show their year; a new
-  post's row in the post list follows its title as it's typed.
-
-- After the user's full-screen test: full screen keeps the preview as it was and only hides the
-  post list; the preview skips redrawing when nothing changed and isn't updated while hidden; big
-  pictures get small JPEG preview copies (sips, in the background); pictures with width and height
-  attributes no longer stretch. Captions can hold quotes (`\"`), and captioned local pictures now
-  upload (they didn't match before). Round trip: identical on all 12 posts, 1 block kept as a card.
-
-- Entering or leaving full screen (and resizing, or showing the preview or post list) no longer
-  scrolls the title out of view or leaves stale pixels: the editor goes back to what was at its top.
+Round trips are safe: `html2md` renders every block back and keeps anything that wouldn't come
+back the same as an HTML card; line breaks, Ghost-style quotes, captions with quotes and image
+sizes survive. On the 12 posts on the site the result is identical, with one block kept as a card.
 
 Ideas for later: fold HTML cards into a compact token in the editor; keep a link's `rel` in
-Markdown so the last lossy block on the site can become text; a real Ghost-style slug preview for
-non-Latin titles.
+Markdown; a Ghost-style slug preview for non-Latin titles.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 
