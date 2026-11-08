@@ -4,7 +4,8 @@
 
 usage: build_app.py <app source dir> <destination dir>
 
-The source dir holds main.py, app.json ({"name", "id", "version"}) and optionally icon.py
+The source dir holds main.py, app.json ({"name", "id", "version"}, optionally "copyright" and
+"info": extra Info.plist keys) and optionally icon.py
 (a render(path, size) function that draws the icon with AppKit).
 """
 import imp
@@ -60,6 +61,7 @@ def build(src, dest):
         "LSMinimumSystemVersion": "10.7", "NSPrincipalClass": "NSApplication",
         "NSHumanReadableCopyright": meta.get("copyright", ""),
     }
+    info.update(meta.get("info", {}))  # extra Info.plist keys, e.g. LSUIElement for a menu bar app
     icon_py = os.path.join(src, "icon.py")
     if os.path.exists(icon_py):
         png = os.path.join(resources, "AppIcon.png")

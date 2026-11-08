@@ -17,7 +17,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 | `lionkit` library: http, keychain, ghost, spotify, markdown, html2md, cocoa, icons | — | works |
 | Planchette (Ghost blog editor) | 0.3 | in user testing |
 | Kassett (Spotify Connect remote) | 0.2 | in user testing; cassette redesign mocked up |
-| WiFiFix (WPA2/WPA3 transition networks) | — | running on the Mac; script in `system/` |
+| WiFiFix (WPA2/WPA3 transition networks) | 0.1 | menu bar app built (demo-verified); the old script still runs the Mac |
 | Dev tooling: deploy, launch (GUI session), shot, build_lionkit | — | works |
 
 ## Milestones
@@ -165,7 +165,7 @@ Plan: `docs/distribution.md`. Remaining:
   create the GitHub repo, push, or publish a release without their explicit go-ahead.**
 
 ## WS-7 · System fixes
-**Status:** todo · **Branch:** `ws/system` · **Owns:** `system/`
+**Status:** review (WiFiFix 0.1 built, not yet tried on a real network) · **Branch:** `ws/system` · **Owns:** `system/`
 
 - **WiFiFix for everyone**: Lion labels WPA2/WPA3 transition networks "WPA2 Enterprise" and won't
   join them. Turn `system/WiFiFix/wififix.sh` into a small app with a menu-bar status item: pick
@@ -173,6 +173,25 @@ Plan: `docs/distribution.md`. Remaining:
   GUI session.
 - A "Lion in 2026" setup guide on the site: Momiji, uBlock Origin, h264ify, which Apple
   services to switch off, Wi-Fi fix, LionKit apps.
+
+Done (0.1, see `system/WiFiFix/README.md`): the menu bar app with a key-shaped status glyph
+(signal, joining animation, off), a Lion-style network menu, a join dialog modelled on Lion's
+own, rejoin with back-off, passwords in the login keychain, Open at Login, Forget, "Rejoin Now",
+and a guided removal of the old helper. A brass-key app icon. Demo mode with made-up networks
+for screenshots. `tools/deploy.sh` now builds `system/*` apps, and `tools/build_app.py` accepts
+extra Info.plist keys (`"info"` in app.json, used for `LSUIElement`).
+
+Verified on the Mac, in demo mode only: every dialog state, the custom menu rows, the status
+glyph in the menu bar, and the rejoin loop up to a failed join. The app is installed in
+/Applications but not running, and the old `local.wififix` agent is untouched.
+
+Next:
+- Nobody has opened the real menu yet. An open menu can't be captured over SSH, so the user
+  needs to click it once (check row highlight, the scan on open, and how the menu resizes).
+- Joining for real is untested: the join code is the script's, but the real scan and the
+  join run only when the user acts. The user does the migration in the README's order.
+- "Open at Login" is untested (it adds a real login item). Reading the list works.
+- The site's Wi-Fi Fix card still shows the old glass-disc icon (WS-6).
 
 ---
 
