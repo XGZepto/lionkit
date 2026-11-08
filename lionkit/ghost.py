@@ -94,6 +94,11 @@ class Ghost(object):
             raise GhostNotFound("This post no longer exists on the site.")
         return self._check(r, "Post update")["posts"][0]
 
+    def delete_post(self, post_id):
+        r = http.request("DELETE", self.site + "/ghost/api/admin/posts/%s/" % post_id, headers=self._headers())
+        if r.status != 204:
+            self._check(r, "Post deletion")
+
     def tag_names(self):
         r = http.request("GET", self.site + "/ghost/api/admin/tags/?limit=all&fields=name", headers=self._headers())
         return sorted(t["name"] for t in self._check(r, "Tag list")["tags"])

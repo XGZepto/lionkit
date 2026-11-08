@@ -100,7 +100,7 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** review (waiting on the user for three checks) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** review (only real full screen is unchecked) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
 Done and checked on the Mac (screenshots, or the app's own snapshot while the screen was locked):
 - The status line, title and rule scroll with the text, so a long title never hides the first line
@@ -115,11 +115,15 @@ Done and checked on the Mac (screenshots, or the app's own snapshot while the sc
 - Find bar (⌘F, ⌥⌘F with Replace), the focus layout used in full screen, image paste (files and
   pictures), the inspector (address with Copy, feature image well that takes drops).
 
+- The user dragged a Photo Booth picture from Finder into a local draft: it was imported and shown.
+- Scheduling, tested on the real site with the user's go-ahead on 2026-11-08 using throwaway drafts
+  (draft → scheduled for 2031 → moved → unscheduled → deleted; the site reported no email and
+  nothing was published). It is on by default; `EnableScheduling -bool NO` hides it.
+- Even line spacing for Chinese text (fixed body line height); far-off dates show their year; a new
+  post's row in the post list follows its title as it's typed.
+
 Waiting on the user:
-- Try real full screen (⌃⌘F) and a real drag from Finder; neither can be done over SSH.
-- Scheduling is built but switched off (`defaults write page.zepto.planchette EnableScheduling -bool
-  YES` shows it) because testing it needs a throwaway post on the real site. With the user's
-  go-ahead: create a draft, schedule it for a far-off date, unschedule it, delete it, then turn it on.
+- Try real full screen (⌃⌘F); entering it over SSH would switch the user's Space.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 

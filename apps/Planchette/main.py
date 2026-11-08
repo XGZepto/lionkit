@@ -172,7 +172,9 @@ def short_time(iso):
         return u""
     hour = NSDateFormatter.alloc().init()
     hour.setTimeStyle_(NSDateFormatterShortStyle)
-    return u"%s, %s" % (unicode(time.strftime("%b %d", time.localtime(seconds))).replace(u" 0", u" "),
+    this_year = time.localtime(seconds).tm_year == time.localtime().tm_year
+    return u"%s, %s" % (unicode(time.strftime("%b %d" if this_year else "%b %d, %Y",
+                                              time.localtime(seconds))).replace(u" 0", u" "),
                         hour.stringFromDate_(NSDate.dateWithTimeIntervalSince1970_(seconds)))
 
 
@@ -187,13 +189,16 @@ def long_day(iso):
 
 
 def long_date(iso):
-    """'Monday, November 9 at 9:00 AM', in this Mac's time zone and locale."""
+    """'Monday, November 9 at 9:00 AM' (with the year when it isn't this one), in this Mac's time
+    zone and locale."""
     seconds = iso_seconds(iso)
     if seconds is None:
         return u""
     date = NSDate.dateWithTimeIntervalSince1970_(seconds)
     day, hour = NSDateFormatter.alloc().init(), NSDateFormatter.alloc().init()
-    day.setDateFormat_(NSDateFormatter.dateFormatFromTemplate_options_locale_("EEEEMMMMd", 0, NSLocale.currentLocale()))
+    this_year = time.localtime(seconds).tm_year == time.localtime().tm_year
+    day.setDateFormat_(NSDateFormatter.dateFormatFromTemplate_options_locale_(
+        "EEEEMMMMd" if this_year else "EEEEMMMMdy", 0, NSLocale.currentLocale()))
     hour.setTimeStyle_(NSDateFormatterShortStyle)
     return u"%s at %s" % (day.stringFromDate_(date), hour.stringFromDate_(date))
 
@@ -297,9 +302,14 @@ def highlight(storage):
     if "fonts" not in _STYLE:
         _STYLE["fonts"] = _fonts()
         para = NSMutableParagraphStyle.alloc().init()
-        para.setLineHeightMultiple_(1.22)
+        para.setMinimumLineHeight_(24)  # fixed, so lines in a fallback font (Chinese) space evenly
+        para.setMaximumLineHeight_(24)
         para.setParagraphSpacing_(3)
         _STYLE["para"] = para
+        heading_para = NSMutableParagraphStyle.alloc().init()
+        heading_para.setLineHeightMultiple_(1.1)
+        heading_para.setParagraphSpacing_(3)
+        _STYLE["heading_para"] = heading_para
         code_para = NSMutableParagraphStyle.alloc().init()
         code_para.setLineHeightMultiple_(1.1)
         _STYLE["code_para"] = code_para  # no paragraph spacing, so the shading has no gaps
@@ -326,6 +336,8 @@ def highlight(storage):
             if kind == "heading":
                 level = len(m.group(1))
                 attr(s, e, font=f["h1" if level == 1 else "h2" if level == 2 else "h3"])
+                storage.addAttribute_value_range_(NSParagraphStyleAttributeName, _STYLE["heading_para"],
+                                                  NSMakeRange(s, e - s))
                 attr(s, s + level, color=FAINT)
             elif kind in ("fence", "card"):
                 attr(s, e, font=f["mono"], color=QUOTE if kind == "fence" else FAINT, bg=CODE_BG)
@@ -704,6 +716,49 @@ class AppDelegate(NSObject):
                     return len(posts)
 
                 cocoa.in_background(fetch, lambda n, e: (print("roundtrip", n, e), sys.stdout.flush()))
+            elif name in ("save-test", "schedule-test", "reschedule-test", "unschedule-test", "delete-test", "state"):
+                d = self.doc or {}
+                if name == "state":
+                    print("state", repr((d.get("id"), d.get("status"), d.get("published_at"), d.get("dirty"),
+                                         d.get("title"), self.secondaryButton.title())))
+                    sys.stdout.flush()
+                    continue
+                if not (d.get("title") or u"").startswith(u"Planchette test") or d.get("status") == "published":
+                    print("refusing", name, "on", repr((d.get("title"), d.get("status"))))
+                    sys.stdout.flush()
+                    return
+                if name == "save-test":
+                    self.push(None, False, False)
+                elif name in ("schedule-test", "reschedule-test"):
+                    was_dirty = d.get("dirty")
+                    d["publish_later"], d["published_at"] = True, arg
+                    if name == "schedule-test":
+                        save_doc(d)
+                        self.push("scheduled", False, True)
+                    else:
+                        self.markDirty(was_dirty)
+                        self.push(None, False, False)
+                elif name == "unschedule-test":
+                    self.push("draft", False, True)
+                elif name == "delete-test" and d.get("id"):
+                    g, post_id = self.ghostClient(False), d["id"]
+
+                    def gone(_, error, post_id=post_id):
+                        print("deleted", repr((post_id, error)))
+                        sys.stdout.flush()
+                        if not error:
+                            os.remove(doc_path(post_id))
+                            self.showDoc(next((d for d in local_docs().values() if not d.get("id")), None) or
+                                         self.createDoc())
+                            self.refresh_(None)
+
+                    cocoa.in_background(lambda: g.delete_post(post_id), gone)
+            elif name == "check":  # what the site itself says about the open post (read-only)
+                g, post_id = self.ghostClient(False), (self.doc or {}).get("id")
+                if post_id:
+                    cocoa.in_background(lambda: g.get_post(post_id),
+                                        lambda p, e: (print("site", repr((p and p["status"], p and p.get("published_at"),
+                                                                 p and p.get("email"), e))), sys.stdout.flush()))
             elif name == "top":
                 clip = self.editorScroll.contentView()
                 clip.scrollToPoint_(NSMakePoint(0, 0))
@@ -1390,6 +1445,19 @@ class AppDelegate(NSObject):
         self.doc["title"] = re.sub(r"\s*[\r\n]+\s*", u" ", self.titleField.stringValue())
         self.doc["markdown"] = self.textView.string()
         self.markDirty(was_dirty)
+        self.renameRow()
+
+    def renameRow(self):
+        """The post list shows the title as it's typed (rebuildSidebar only runs when a post first
+        gets unsaved changes, and new posts start out with them)."""
+        for _, items in self.groups:
+            for item in items:
+                if item["key"] == self.doc["key"]:
+                    title = self.doc.get("title") or u"Untitled"
+                    if item["title"] != title:
+                        item["title"] = title
+                        self.outline.reloadItem_(item)
+                    return
 
     def markDirty(self, was_dirty):
         self.doc["dirty"] = True
@@ -1678,9 +1746,9 @@ class AppDelegate(NSObject):
 
     # ---- publish date: scheduling drafts, moving scheduled and published posts -----------------------
     def schedulingEnabled(self):
-        """Scheduling and moving publish dates stay off until they've been tried against a real site:
-        `defaults write page.zepto.planchette EnableScheduling -bool YES`."""
-        return self.defaults.boolForKey_("EnableScheduling")
+        """On unless turned off with `defaults write page.zepto.planchette EnableScheduling -bool NO`.
+        Tried against a real site on 2026-11-08: draft, schedule, move, unschedule, delete."""
+        return self.defaults.objectForKey_("EnableScheduling") is None or self.defaults.boolForKey_("EnableScheduling")
 
     def loadPublishDate(self):
         d = self.doc
