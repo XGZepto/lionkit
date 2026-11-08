@@ -74,12 +74,64 @@ def draw_brushed(w, h, top_line=True):
         paint.fill(NSMakeRect(0, 1, w, 1), white(1, 0.8))
 
 
+STRIP = NSMakeRect(22, 330, 736, 104)     # the recessed control strip
+INDEX = NSMakeRect(490, 32, 268, 284)     # the dark window that holds the J-card and the counter
+LEDS = {"green": "#5fe04a", "amber": "#ffb12e"}
+
+
+def draw_recess(r, radius, top, bottom, depth=0.85):
+    """A window cut into the faceplate: light catches its lower edge, the inside is dark and deep."""
+    paint.fill(paint.rounded(NSOffsetRect(r, 0, 1), radius), white(1, 0.8))
+    shape = paint.rounded(r, radius)
+    paint.fill(shape, top, bottom)
+    paint.inner_shadow(shape, 3, 8, white(0, depth))
+    paint.stroke(paint.rounded(NSInsetRect(r, 0.5, 0.5), radius - 0.5), white(0, 0.55))
+    return shape
+
+
+def draw_strip(r):
+    paint.fill(paint.rounded(NSOffsetRect(r, 0, 1), 8), white(1, 0.75))
+    shape = paint.rounded(r, 8)
+    paint.fill(shape, "#cbcbcb", "#b3b3b3")
+
+    def brushing():
+        for y in range(int(r.origin.y), int(r.origin.y + r.size.height), 3):
+            paint.fill(NSMakeRect(r.origin.x, y, r.size.width, 1), white(1, 0.10))
+    paint.clipped(shape, brushing)
+    paint.inner_shadow(shape, 1, 3, white(0, 0.35))
+
+
+def draw_slot(r):
+    paint.fill(paint.corners(NSOffsetRect(r, 0, 1), 2, 2, 6, 6), white(1, 0.7))
+    shape = paint.corners(r, 2, 2, 6, 6)
+    paint.fill(shape, "#141517")
+    paint.inner_shadow(shape, 2, 3, white(0, 0.9))
+
+
+def draw_led(cx, cy, name):
+    """A small indicator light: green, amber, or None for off."""
+    lamp = paint.oval(cx, cy, 3.2)
+    if name is None:
+        paint.fill(paint.oval(cx, cy + 0.6, 3.2), white(1, 0.6))
+        paint.fill(lamp, "#3b2f25")
+        paint.inner_shadow(lamp, 1, 1, white(0, 0.6))
+        return
+    color = hexc(LEDS[name])
+    paint.with_shadow(paint.shadow(0, 6, color), lambda: paint.fill(lamp, color))
+    NSGradient.alloc().initWithStartingColor_endingColor_(white(1, 0.95), color).drawInBezierPath_relativeCenterPosition_(
+        lamp, NSMakePoint(-0.25, -0.35))
+
+
 class DeckView(FlippedView):
     def initWithFrame_(self, frame):
         self = super(DeckView, self).initWithFrame_(frame)
         if self:
             self.bg = None
             self.onKey = None
+            self.labels = []          # (text, rect, led name or None) printed above the controls
+            self.slots = []
+            self.leds = {}
+            self.controlsShown = True
         return self
 
     def isOpaque(self):
@@ -95,11 +147,41 @@ class DeckView(FlippedView):
         if not (self.onKey and self.onKey(event)):
             super(DeckView, self).keyDown_(event)
 
+    def setLed(self, led, name):
+        if self.leds.get(led) != name:
+            self.leds[led] = name
+            for text, r, which in self.labels:
+                if which == led:
+                    self.setNeedsDisplayInRect_(NSInsetRect(r, -14, -8))
+
     def drawRect_(self, rect):
         b = self.bounds()
         if self.bg is None:
-            self.bg = flipped_image(b.size.width, b.size.height, lambda: draw_brushed(b.size.width, b.size.height))
+            self.bg = flipped_image(b.size.width, b.size.height, self.drawPanel)
         draw_part(self.bg, rect, NSCompositeCopy)
+        if not self.controlsShown:
+            return
+        for r in self.slots:
+            if NSIntersectsRect(rect, NSInsetRect(r, -2, -2)):
+                draw_slot(r)
+        f = paint.font("Helvetica-Bold", 7.5, True)
+        for text, r, led in self.labels:
+            if not NSIntersectsRect(rect, NSInsetRect(r, -14, -8)):
+                continue
+            paint.text(text, r, f, "#474747", NSCenterTextAlignment, kern=1.3, sh=paint.engraved())
+            if led:
+                tw = paint.text_width(text, f, 1.3)
+                draw_led(r.origin.x + (r.size.width - tw) / 2.0 - 8, r.origin.y + 4.5, self.leds.get(led))
+
+    def drawPanel(self):
+        w, h = self.bounds().size.width, self.bounds().size.height
+        draw_brushed(w, h)
+        paint.text(u"KASSETT", NSMakeRect(26, 10, 200, 16), paint.font("Helvetica-Bold", 12, True), "#3c3c3c",
+                   kern=4, sh=paint.engraved())
+        paint.text(u"STEREO CASSETTE DECK", NSMakeRect(w - 26 - 300, 12, 300, 12), paint.font("Helvetica-Bold", 8, True),
+                   "#5c5c5c", NSRightTextAlignment, kern=2.2, sh=paint.engraved())
+        draw_recess(INDEX, 10, "#17181b", "#26282c")
+        draw_strip(STRIP)
 
 
 # ---- the cassette in its well ------------------------------------------------------------------------
@@ -157,11 +239,12 @@ class CassetteView(FlippedView):
         draw_part(self.overlay, rect)
 
     def drawBody(self):
-        well = paint.rounded(self.WELL, 10)
         paint.fill(paint.rounded(NSOffsetRect(self.WELL, 0, 1), 10), white(1, 0.85))
-        paint.fill(well, "#17181b", "#26282c")
-        paint.inner_shadow(well, 3, 10, white(0, 0.85))
-        paint.stroke(paint.rounded(NSInsetRect(self.WELL, 0.5, 0.5), 9.5), white(0, 0.6))
+        paint.fill(paint.rounded(self.WELL, 10), "#f6f6f6", "#9b9b9b")          # the chrome door frame
+        paint.stroke(paint.rounded(NSInsetRect(self.WELL, 0.5, 0.5), 9.5), white(0, 0.38))
+        bay = paint.rounded(NSInsetRect(self.WELL, 4, 4), 7)
+        paint.fill(bay, "#121315", "#222428")
+        paint.inner_shadow(bay, 3, 10, white(0, 0.9))
 
         sx, sy = self.SHELL
         top, bottom = SHELLS.get(self.shell, SHELLS["black"])
@@ -176,12 +259,21 @@ class CassetteView(FlippedView):
         draw_label(sx + 22, sy + 16, self.title, self.subtitle, self.p)
 
     def drawGlass(self):
+        """The smoked acrylic door: a light tint, a reflection across it and a pull notch at the top."""
         sx, sy = self.SHELL
         win = NSMakeRect(sx + 22 + 68, sy + 16 + 64, 220, 62)
         paint.clipped(paint.rounded(win, 8), lambda: paint.fill(
             NSMakeRect(win.origin.x, win.origin.y, 220, 26), white(1, 0.16), white(1, 0)))
-        paint.clipped(paint.rounded(self.WELL, 10), lambda: paint.gradient(
-            (white(1, 0.16), 0), (white(1, 0.03), 0.38), (white(1, 0), 0.6)).drawInRect_angle_(self.WELL, 65))
+        inner = NSInsetRect(self.WELL, 4, 4)
+        door = paint.rounded(inner, 7)
+        paint.fill(door, white(0, 0.10))
+        paint.clipped(door, lambda: paint.gradient(
+            (white(1, 0.18), 0), (white(1, 0.05), 0.34), (white(1, 0), 0.35), (white(1, 0.035), 0.6),
+            (white(1, 0), 0.78)).drawInRect_angle_(inner, 62))
+        paint.stroke(paint.rounded(NSInsetRect(inner, 1, 1), 6), white(1, 0.10), 1)
+        notch = paint.corners(NSMakeRect(196, 4, 60, 6), 0, 0, 3, 3)
+        paint.fill(paint.corners(NSMakeRect(196, 5, 60, 6), 0, 0, 3, 3), white(1, 0.12))
+        paint.fill(notch, "#0a0a0b")
 
 
 def draw_screw(cx, cy, r):
@@ -328,7 +420,7 @@ def draw_hub(cx, cy, angle, r=17.0):
 
 # ---- the J-card: the album cover in the case --------------------------------------------------------
 class JCardView(FlippedView):
-    CARD = NSMakeRect(6, 3, 178, 178)
+    CARD = NSMakeRect(6, 3, 176, 176)
 
     def initWithFrame_(self, frame):
         self = super(JCardView, self).initWithFrame_(frame)
@@ -345,7 +437,7 @@ class JCardView(FlippedView):
 
     def drawRect_(self, rect):
         c = self.CARD
-        paint.with_shadow(paint.shadow(3, 8, white(0, 0.45)), lambda: paint.fill(c, "#7a6a50"))
+        paint.with_shadow(paint.shadow(3, 8, white(0, 0.75)), lambda: paint.fill(c, "#2a2620"))
         if self.blank:
             draw_blank_card(c)
         elif self.image is not None:
@@ -354,7 +446,7 @@ class JCardView(FlippedView):
             art.draw_placeholder(c, self.name, (self.name or u"").upper(), caption_size=21)
         paint.clipped(NSBezierPath.bezierPathWithRect_(c), lambda: paint.gradient(
             (white(1, 0.22), 0), (white(1, 0), 0.45)).drawInRect_angle_(c, 70))
-        paint.stroke(NSBezierPath.bezierPathWithRect_(NSInsetRect(c, -0.5, -0.5)), white(0, 0.35), 1)
+        paint.stroke(NSBezierPath.bezierPathWithRect_(NSInsetRect(c, -0.5, -0.5)), white(1, 0.14), 1)
 
 
 def draw_blank_card(c):
@@ -410,23 +502,21 @@ class CounterView(FlippedView):
 
     def drawRect_(self, rect):
         w = self.bounds().size.width
-        small = paint.font("Helvetica-Bold", 9, True)
-        paint.text(u"TAPE COUNTER", NSMakeRect(0, 0, w, 12), small, "#4a4a4a", NSCenterTextAlignment,
-                   kern=1.5, sh=paint.engraved())
-        bx = (w - 110) / 2.0
-        bezel = paint.rounded(NSMakeRect(bx, 16, 110, 40), 5)
-        paint.fill(paint.rounded(NSMakeRect(bx, 17, 110, 40), 5), white(1, 0.85))
-        paint.fill(bezel, "#111214")
+        bx = (w - 118) / 2.0
+        paint.fill(paint.rounded(NSMakeRect(bx, 2, 118, 46), 6), "#606266", "#2a2b2e")    # metal surround
+        paint.stroke(paint.rounded(NSMakeRect(bx + 0.5, 2.5, 117, 45), 5.5), white(1, 0.14))
+        bezel = paint.rounded(NSMakeRect(bx + 4, 6, 110, 38), 4)
+        paint.fill(bezel, "#0d0e10")
         paint.inner_shadow(bezel, 2, 4, white(0, 0.9))
         digit_font = paint.font("Helvetica-Bold", 22, True)
         now = time.time()
+        base = bx + 4
         for i, x in enumerate((7, 29, 61, 83)):
-            wheel = NSMakeRect(bx + x, 21, 20, 30)
-            self.drawWheel(wheel, i, digit_font, now)
-        paint.text(u":", NSMakeRect(bx + 51, 23, 8, 26), paint.font("Helvetica-Bold", 20, True), "#c9c4b8",
+            self.drawWheel(NSMakeRect(base + x, 10, 20, 30), i, digit_font, now)
+        paint.text(u":", NSMakeRect(base + 51, 11, 8, 26), paint.font("Helvetica-Bold", 20, True), "#c9c4b8",
                    NSCenterTextAlignment)
-        paint.text(self.remaining, NSMakeRect(0, 60, w, 15), paint.ui(11), "#3f3f3f", NSCenterTextAlignment,
-                   sh=paint.engraved())
+        paint.text(self.remaining, NSMakeRect(0, 56, w, 15), paint.ui(11), "#c4c4c4", NSCenterTextAlignment,
+                   sh=paint.shadow(-1, 0, white(0, 0.7)))
 
     def drawWheel(self, wheel, i, f, now):
         shape = paint.rounded(wheel, 2)
@@ -448,14 +538,15 @@ class CounterView(FlippedView):
         paint.clipped(shape, digits)
 
 
-# ---- the progress slider -----------------------------------------------------------------------------
-class ProgressView(FlippedView):
-    LEFT, RIGHT = 40, 40
+# ---- the tape position: a tuner-style dial ------------------------------------------------------------
+class DialView(FlippedView):
+    """Minutes printed along a dark dial with an orange needle at the playing position. Drag to seek."""
+    PAD = 14
 
     def initWithFrame_(self, frame):
-        self = super(ProgressView, self).initWithFrame_(frame)
+        self = super(DialView, self).initWithFrame_(frame)
         if self:
-            self.p, self.elapsed, self.total = 0.0, u"0:00", u"0:00"
+            self.p, self.elapsed, self.total, self.duration = 0.0, u"0:00", u"0:00", 0
             self.dragging, self.enabled = False, False
             self.onSeek = None
         return self
@@ -469,36 +560,40 @@ class ProgressView(FlippedView):
         self.total, self.enabled = total, enabled
         self.setNeedsDisplay_(True)
 
-    def trackWidth(self):
-        return self.bounds().size.width - self.LEFT - self.RIGHT
-
     def drawRect_(self, rect):
-        w = self.bounds().size.width
-        f = paint.ui(10)
-        paint.text(self.elapsed, NSMakeRect(0, 2, 32, 14), f, "#3f3f3f", sh=paint.engraved())
-        paint.text(self.total, NSMakeRect(w - 32, 2, 32, 14), f, "#3f3f3f", NSRightTextAlignment, sh=paint.engraved())
-        tw = self.trackWidth()
-        track = NSMakeRect(self.LEFT, 6, tw, 6)
-        paint.fill(paint.rounded(NSOffsetRect(track, 0, 1), 3), white(1, 0.85))
-        shape = paint.rounded(track, 3)
-        paint.fill(shape, "#8b8b8b", "#a9a9a9")
-        paint.inner_shadow(shape, 1, 2, white(0, 0.55))
-        if not self.enabled:
-            return
-        filled = NSMakeRect(self.LEFT, 6, max(6, tw * self.p), 6)
-        paint.fill(paint.rounded(filled, 3), "#4b4b4f", "#2b2b2e")
-        kx = self.LEFT + tw * self.p - 8
-        knob = NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(kx, 1, 16, 16))
-        paint.with_shadow(paint.shadow(1, 2, white(0, 0.55)), lambda: paint.fill(knob, "#c4c4c4"))
-        paint.gradient(("#ffffff", 0), ("#c4c4c4", 0.7), ("#a3a3a3", 1)).drawInBezierPath_relativeCenterPosition_(
-            knob, NSMakePoint(0, -0.3))
+        w, h = self.bounds().size.width, self.bounds().size.height - 1
+        glass = draw_recess(NSMakeRect(0, 0, w, h), 5, "#141518", "#25272c", 0.9)
+        x0, x1 = self.PAD, w - self.PAD
+        secs = self.duration / 1000.0 if self.duration else 240.0
+        major = 60.0 if secs <= 8 * 60 else (120.0 if secs <= 16 * 60 else 300.0)
+        dim = 1.0 if self.duration else 0.45
+        base = 42
+        paint.fill(NSMakeRect(x0, base, x1 - x0, 1), white(1, 0.45 * dim))
+        num = paint.font("Helvetica-Bold", 8, True)
+        steps = int(secs // (major / 4)) + 1
+        for i in range(steps):
+            x = round(x0 + (x1 - x0) * (i * major / 4) / secs) - 0.5
+            if i % 4 == 0:
+                paint.fill(NSMakeRect(x, base - 9, 1, 9), white(1, 0.8 * dim))
+                paint.text(u"%d" % int(i * major / 4 / 60), NSMakeRect(x - 10, base - 22, 21, 10), num,
+                           white(1, 0.7 * dim), NSCenterTextAlignment)
+            else:
+                paint.fill(NSMakeRect(x, base - 4, 1, 4), white(1, 0.4 * dim))
+        paint.text(u"MIN", NSMakeRect(x1 - 40, h - 16, 40, 10), paint.font("Helvetica-Bold", 7, True), white(1, 0.35),
+                   NSRightTextAlignment, kern=1)
+        if self.duration:
+            nx = x0 + (x1 - x0) * self.p
+            color = hexc("#ff6a2b", 1.0 if self.enabled else 0.45)
+            paint.with_shadow(paint.shadow(0, 5, hexc("#ff5a1a", 0.9 if self.enabled else 0.3)),
+                              lambda: paint.fill(NSMakeRect(nx - 1, 7, 2, h - 14), color))
+        paint.clipped(glass, lambda: paint.fill(NSMakeRect(0, 0, w, h / 2.0), white(1, 0.08), white(1, 0)))
 
     def fraction(self, event):
         x = self.convertPoint_fromView_(event.locationInWindow(), None).x
-        return max(0.0, min(1.0, (x - self.LEFT) / float(self.trackWidth())))
+        return max(0.0, min(1.0, (x - self.PAD) / float(self.bounds().size.width - 2 * self.PAD)))
 
     def mouseDown_(self, event):
-        if not self.enabled:
+        if not (self.enabled and self.duration):
             return
         self.dragging = True
         self.p = self.fraction(event)
@@ -527,53 +622,42 @@ class KeyButton(NSButton):
 
 
 class KeyCell(NSButtonCell):
-    """A chunky transport key that comes out from under the deck's front panel. `latched` keeps
-    it down (PLAY while playing, PAUSE while paused); the others go down only while pressed."""
+    """An aluminium piano key that comes out of a slot in the control strip. `latched` keeps it down
+    (PLAY while playing, PAUSE while paused); the others go down only while pressed."""
 
     def drawWithFrame_inView_(self, frame, view):
-        latched = getattr(self, "latched", False)
-        down = latched or self.isHighlighted()
-        free = getattr(self, "free", False)   # the LIBRARY key stands alone with all corners round
-        w, h = frame.size.width, 62
-        body = NSMakeRect(0, 0 if free or not down else 3, w, h)
-        shape = paint.rounded(body, 6) if free else paint.corners(body, 0, 0, 6, 6)
-        if free:
-            paint.with_shadow(paint.shadow(2, 3, white(0, 0.35)), lambda: paint.fill(shape, "#cdcdcd"))
-        elif not down:
-            paint.fill(paint.corners(NSOffsetRect(body, 0, 1), 0, 0, 6, 6), white(0, 0.5))
+        down = getattr(self, "latched", False) or self.isHighlighted()
+        w, face = frame.size.width, 64
+        y = 3 if down else 0
+        body = NSMakeRect(0, y, w, face)
+        shape = paint.corners(body, 0, 0, 3, 3)
+        lip = 6 if down else 10          # the angled front edge you push
+        if not down:
+            paint.fill(paint.corners(NSOffsetRect(body, 0, 1), 0, 0, 3, 3), white(0, 0.55))
+        paint.fill(shape, *(("#d9d9d9", "#bcbcbc") if down else ("#f8f8f8", "#d2d2d2")))
+
+        def detail():
+            paint.fill(NSMakeRect(0, y + face - lip, w, lip), *(("#a8a8a8", "#8a8a8a") if down else ("#c4c4c4", "#949494")))
+            paint.fill(NSMakeRect(0, y + face - lip, w, 1), white(1, 0.6))
+            paint.fill(NSMakeRect(0, y, w, 1), white(1, 0.5 if down else 0.95))
+            paint.fill(NSMakeRect(0, y, 1, face), white(1, 0.5))
+            paint.fill(NSMakeRect(w - 1, y, 1, face), white(0, 0.14))
+        paint.clipped(shape, detail)
         if down:
-            paint.fill(shape, "#c9c9c9", "#b4b4b4")
-            paint.inner_shadow(shape, 2, 4, white(0, 0.35))
-        else:
-            paint.fill(shape, "#fbfbfb", "#cdcdcd")
-            paint.clipped(shape, lambda: (
-                paint.fill(NSMakeRect(0, body.origin.y, w, 1), white(1)),
-                paint.fill(NSMakeRect(0, body.origin.y + h - 3, w, 3), white(0, 0.16))))
-        if free:
-            paint.stroke(paint.rounded(NSInsetRect(body, 0.5, 0.5), 5.5), white(0, 0.35), 1)
-        ink = hexc("#2f2f2f" if getattr(self, "primary", False) else "#3a3a3a", 1.0 if self.isEnabled() else 0.4)
+            paint.inner_shadow(shape, 3, 4, white(0, 0.4))
         name = getattr(self, "glyph", "play")
         gw, gh = glyphs.size(name)
-        top = body.origin.y + (h - (gh + 6 + 8)) / 2.0 + 1
-        glyphs.draw_at(name, (w - gw) / 2.0, top, ink)
-        paint.text(getattr(self, "caption", u""), NSMakeRect(0, top + gh + 5, w, 11),
-                   paint.font("Helvetica-Bold", 8, True), ink, NSCenterTextAlignment, kern=1)
+        scale = 0.85
+        gx, gy = (w - gw * scale) / 2.0, y + (face - lip - gh * scale) / 2.0
+        alpha = 1.0 if self.isEnabled() else 0.35
+        glyphs.draw(name, NSMakeRect(gx, gy + 1, gw * scale, gh * scale), white(1, 0.85 * alpha))
+        glyphs.draw(name, NSMakeRect(gx, gy, gw * scale, gh * scale), hexc("#474747", alpha))
 
 
-class KeyBedView(FlippedView):
-    def drawRect_(self, rect):
-        b = self.bounds()
-        bed = NSMakeRect(0, 0, b.size.width, b.size.height - 1)
-        paint.fill(paint.corners(NSOffsetRect(bed, 0, 1), 0, 0, 7, 7), white(1, 0.85))
-        shape = paint.corners(bed, 0, 0, 7, 7)
-        paint.fill(shape, "#1c1d20")
-        paint.inner_shadow(shape, 2, 3, white(0, 0.8))
-
-
-def make_key(parent, frame, glyph, caption, target, action, free=False):
+def make_key(parent, frame, glyph, caption, target, action):
     key = KeyButton.alloc().initWithFrame_(frame)
     cell = KeyCell.alloc().init()
-    cell.glyph, cell.caption, cell.free, cell.latched = glyph, caption, free, False
+    cell.glyph, cell.caption, cell.latched = glyph, caption, False
     cell.setButtonType_(NSMomentaryChangeButton)
     key.setCell_(cell)
     key.setTarget_(target)
@@ -607,28 +691,56 @@ class KnobView(FlippedView):
         self.setNeedsDisplay_(True)
 
     def drawRect_(self, rect):
-        w = self.bounds().size.width
-        kx = (w - 74) / 2.0
-        ring = NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(kx, 2, 74, 74))
-        paint.with_shadow(paint.shadow(2, 4, white(0, 0.5)), lambda: paint.fill(ring, "#8c8c8c"))
-        paint.fill(ring, "#8c8c8c", "#e8e8e8")
-        paint.clipped(ring, lambda: paint.stroke(NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(kx + 0.5, 2.5, 73, 73)),
-                                                 white(1, 0.6), 1))
+        cx, cy, r = self.bounds().size.width / 2.0, 46.0, 30.0
+        on = 1.0 if self.enabled else 0.5
+
+        def at(deg, radius):
+            a = math.radians(deg)
+            return NSMakePoint(cx + radius * math.sin(a), cy - radius * math.cos(a))
+        for i in range(11):                       # the scale printed on the strip, 0 to 10
+            deg = -135 + 27 * i
+            r0, r1, width = (33.5, 41, 1.6) if i % 5 == 0 else (34.5, 39, 1.1)
+            for dy, color in ((1, white(1, 0.7)), (0, hexc("#454545", on))):
+                tick = NSBezierPath.bezierPath()
+                p0, p1 = at(deg, r0), at(deg, r1)
+                tick.moveToPoint_(NSMakePoint(p0.x, p0.y + dy))
+                tick.lineToPoint_(NSMakePoint(p1.x, p1.y + dy))
+                paint.stroke(tick, color, width)
+        small = paint.font("Helvetica-Bold", 7, True)
+        for text, deg in ((u"0", -135), (u"10", 135)):
+            p = at(deg, 47)
+            paint.text(text, NSMakeRect(p.x - 8, p.y - 5, 16, 10), small, hexc("#4a4a4a", on), NSCenterTextAlignment,
+                       sh=paint.engraved())
+        if self.enabled:
+            paint.text(u"%d" % self.volume, NSMakeRect(cx - 12, cy + 33, 24, 10), small, "#4a4a4a",
+                       NSCenterTextAlignment, sh=paint.engraved())
+        body = paint.oval(cx, cy, r)
+        paint.with_shadow(paint.shadow(3, 5, white(0, 0.55)), lambda: paint.fill(body, "#9a9a9a"))
+        paint.fill(body, "#f3f3f3", "#8c8c8c")
+
+        def knurl():
+            for i in range(84):
+                deg = i * 360 / 84.0
+                line = NSBezierPath.bezierPath()
+                line.moveToPoint_(at(deg, r - 4))
+                line.lineToPoint_(at(deg, r))
+                paint.stroke(line, white(1, 0.45) if i % 2 else white(0, 0.22), 1)
+        paint.clipped(body, knurl)
         if self.face is None:
             self.face = flipped_image(66, 66, draw_knob_face)
         self.face.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
-            NSMakeRect(kx + 4, 6, 66, 66), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
-        NSGraphicsContext.saveGraphicsState()
-        t = NSAffineTransform.transform()
-        t.translateXBy_yBy_(kx + 37, 39)
-        t.rotateByDegrees_(-135 + 270 * self.volume / 100.0)
-        t.concat()
-        paint.fill(paint.oval(0, -24, 3), white(1, 0.8))
-        paint.fill(paint.oval(0, -25, 3), "#2f2f2f" if self.enabled else "#8a8a8a")
-        NSGraphicsContext.restoreGraphicsState()
-        label = u"VOLUME %d" % self.volume if self.enabled else u"VOLUME"
-        paint.text(label, NSMakeRect(0, 82, w, 12), paint.font("Helvetica-Bold", 9, True),
-                   "#4a4a4a" if self.enabled else "#7a7a7a", NSCenterTextAlignment, kern=1.5, sh=paint.engraved())
+            NSMakeRect(cx - 25.5, cy - 25.5, 51, 51), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
+        paint.stroke(paint.oval(cx, cy, 25.5), white(0, 0.28), 1)
+        notch = NSBezierPath.bezierPath()
+        notch.moveToPoint_(at(-135 + 270 * self.volume / 100.0, 11))
+        notch.lineToPoint_(at(-135 + 270 * self.volume / 100.0, 22))
+        notch.setLineCapStyle_(NSRoundLineCapStyle)
+        hl = notch.copy()
+        tr = NSAffineTransform.transform()
+        tr.translateXBy_yBy_(0, 1)
+        hl.transformUsingAffineTransform_(tr)
+        paint.stroke(hl, white(1, 0.7), 2.4)
+        paint.stroke(notch, hexc("#2f2f2f", on), 2.4)
 
     def change(self, v, final):
         v = max(0, min(100, int(round(v))))
@@ -792,39 +904,46 @@ class Deck(NSObject):
         deck.onKey = self.app.handleKey
         content.addSubview_(deck)
         self.view = deck
-        self.cassette = CassetteView.alloc().initWithFrame_(NSMakeRect(22, 18, 452, 286))
+        self.cassette = CassetteView.alloc().initWithFrame_(NSMakeRect(22, 32, 452, 286))
         deck.addSubview_(self.cassette)
-        self.jcard = JCardView.alloc().initWithFrame_(NSMakeRect(532, 17, 190, 192))
+        self.jcard = JCardView.alloc().initWithFrame_(NSMakeRect(530, 43, 188, 190))
         deck.addSubview_(self.jcard)
-        self.counter = CounterView.alloc().initWithFrame_(NSMakeRect(496, 212, 262, 76))
+        self.counter = CounterView.alloc().initWithFrame_(NSMakeRect(490, 230, 268, 74))
         deck.addSubview_(self.counter)
-        self.progress = ProgressView.alloc().initWithFrame_(NSMakeRect(22, 314, 452, 18))
+
+        # The control strip: keys in two slots, the tape position dial and the volume knob, each with
+        # its name printed above it like on a real deck.
+        top = STRIP.origin.y + 26
+        deck.slots = [NSMakeRect(32, top - 4, 52, 72), NSMakeRect(100, top - 4, 330, 72)]
+        labels = []
+        self.libraryKey = make_key(deck, NSMakeRect(36, top, 44, 67), "eject", u"LIBRARY", self.app, "showLibrary:")
+        labels.append((u"LIBRARY", NSMakeRect(28, STRIP.origin.y + 8, 60, 10), None))
+        self.keys = {}
+        x = 104
+        for glyph, caption, action, led in (("prev", u"PREV", "previous:", None), ("rew", u"REW", "rewind:", None),
+                                            ("play", u"PLAY", "play:", "play"), ("pause", u"PAUSE", "pause:", "pause"),
+                                            ("ff", u"FF", "fastForward:", None), ("next", u"NEXT", "next:", None)):
+            self.keys[caption] = make_key(deck, NSMakeRect(x, top, 52, 67), glyph, caption, self.app, action)
+            labels.append((caption, NSMakeRect(x - 6, STRIP.origin.y + 8, 64, 10), led))
+            x += 54
+        self.progress = DialView.alloc().initWithFrame_(NSMakeRect(448, top, 180, 66))
         self.progress.onSeek = self.app.seekToFraction
         deck.addSubview_(self.progress)
-
-        bed = KeyBedView.alloc().initWithFrame_(NSMakeRect(22, 364, 364, 67))
-        deck.addSubview_(bed)
-        self.bed = bed
-        self.keys = {}
-        x = 4
-        for glyph, caption, width, action in (("prev", u"PREV", 56, "previous:"), ("rew", u"REW", 56, "rewind:"),
-                                              ("play", u"PLAY", 66, "play:"), ("pause", u"PAUSE", 56, "pause:"),
-                                              ("ff", u"FF", 56, "fastForward:"), ("next", u"NEXT", 56, "next:")):
-            self.keys[caption] = make_key(bed, NSMakeRect(x, 0, width, 65), glyph, caption, self.app, action)
-            x += width + 2
-        self.keys[u"PLAY"].cell().primary = True
-        self.libraryKey = make_key(deck, NSMakeRect(404, 364, 62, 66), "eject", u"LIBRARY", self.app, "showLibrary:", True)
-        self.knob = KnobView.alloc().initWithFrame_(NSMakeRect(640, 340, 94, 96))
+        labels.append((u"TAPE POSITION", NSMakeRect(448, STRIP.origin.y + 8, 180, 10), None))
+        self.knob = KnobView.alloc().initWithFrame_(NSMakeRect(642, STRIP.origin.y + 14, 96, 90))
         self.knob.onChange = self.app.volumeChanged
         deck.addSubview_(self.knob)
+        labels.append((u"VOLUME", NSMakeRect(642, STRIP.origin.y + 8, 96, 10), None))
+        deck.labels = labels
 
-        self.login = NSButton.alloc().initWithFrame_(NSMakeRect(148, 352, 200, 32))
+        self.login = NSButton.alloc().initWithFrame_(NSMakeRect(STRIP.origin.x + STRIP.size.width / 2 - 100,
+                                                                STRIP.origin.y + 18, 200, 32))
         self.login.setBezelStyle_(NSRoundedBezelStyle)
-        self.login.setTitle_(u"Log In to Spotify…")
+        self.login.setTitle_(u"Log In to Spotify\u2026")
         self.login.setTarget_(self.app)
         self.login.setAction_("logIn:")
         deck.addSubview_(self.login)
-        self.loginNote = NSTextField.alloc().initWithFrame_(NSMakeRect(40, 388, 416, 34))
+        self.loginNote = NSTextField.alloc().initWithFrame_(NSMakeRect(60, STRIP.origin.y + 56, DECK_W - 120, 34))
         for f in (self.loginNote,):
             f.setBezeled_(False)
             f.setDrawsBackground_(False)
@@ -850,8 +969,10 @@ class Deck(NSObject):
 
     # ---- showing state ------------------------------------------------------------------------------
     def showLoggedIn(self, logged_in):
-        for v in [self.bed, self.libraryKey, self.knob, self.progress, self.upNextButton, self.airplayButton]:
+        for v in [self.libraryKey, self.knob, self.progress, self.upNextButton, self.airplayButton] + self.keys.values():
             v.setHidden_(not logged_in)
+        self.view.controlsShown = logged_in
+        self.view.setNeedsDisplay_(True)
         for v in (self.login, self.loginNote):
             v.setHidden_(logged_in)
 
@@ -878,6 +999,8 @@ class Deck(NSObject):
         for k in self.keys.values():
             k.setEnabled_(controllable and (has_track or k is self.keys[u"PLAY"]))
             k.setNeedsDisplay_(True)
+        self.view.setLed("play", "green" if playing else None)
+        self.view.setLed("pause", "amber" if has_track and not playing else None)
         self.ensureTimer()
 
     def setPosition(self, progress_ms, duration_ms, jumped):
@@ -888,6 +1011,7 @@ class Deck(NSObject):
             self.cassette.setProgress(p)
         self.p_target = p
         self.counter.setTime(progress_ms, duration_ms - progress_ms if duration_ms else None)
+        self.progress.duration = duration_ms
         self.progress.setValues(p, paint.fmt(progress_ms), paint.fmt(duration_ms),
                                 bool(duration_ms) and getattr(self, "controllable", True))
         self.ensureTimer()

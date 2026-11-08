@@ -76,6 +76,13 @@ every Web API command for a restricted device with 403 "Restricted device" and l
 bottom bar that only the Spotify app can control the device, and lists the device in the AirPlay menu with
 "Spotify app only". Command errors now go to the log.
 
+**Deck redesign:** The user found the first deck layout unpolished, so I rebuilt it as one hi-fi faceplate.
+The cassette sits behind a chrome-framed smoked door, and the J-card and tape counter share a dark glass window.
+Below them, one recessed control strip holds aluminium piano keys in slots with their names printed above, green
+PLAY and amber PAUSE indicator lights, a tuner-style tape position dial with a draggable needle (it replaces the
+slider), and a knurled volume knob over a printed 0–10 scale. I checked it with the fake song and with the
+user's real, restricted speaker group.
+
 **Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
 the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
 cassette app icon in `icon.py` yet. I also couldn't test the not-allowlisted sheet with a real refused
