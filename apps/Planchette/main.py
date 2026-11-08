@@ -5,6 +5,9 @@ Post list with sorting and search, two-way sync with conflict detection, a statu
 a HUD inspector for slug / excerpt / tags / feature image, Markdown syntax highlighting,
 and a live preview that scrolls with the editor.
 """
+from __future__ import print_function
+
+import calendar
 import glob
 import hashlib
 import json
@@ -18,6 +21,7 @@ import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import objc
 from AppKit import *  # noqa: F401,F403 (PyObjC convention)
 from Foundation import *  # noqa: F401,F403
 from PyObjCTools import AppHelper
@@ -39,6 +43,14 @@ EXCERPT_MAX = 300
 GROUPS = [("new", u"ON THIS MAC"), ("draft", u"DRAFTS"), ("scheduled", u"SCHEDULED"), ("published", u"PUBLISHED")]
 STATUS_NAMES = {"new": u"Local", "draft": u"Draft", "scheduled": u"Scheduled", "published": u"Published"}
 SORTS = [(u"Last Edited", "edited"), (u"Publish Date", "published"), (u"Title", "title")]
+IMAGE_TYPES = ("jpg", "jpeg", "png", "gif", "webp")
+SCHEDULE_LEAD = 5 * 60  # the site wants a scheduled time a few minutes ahead; ask for five
+
+# Lion API that PyObjC 2.3's metadata (from Snow Leopard) doesn't know by name.
+FULL_SCREEN_PRIMARY = 1 << 7    # NSWindowCollectionBehaviorFullScreenPrimary
+AUTO_HIDE_TOOLBAR = 1 << 11     # NSApplicationPresentationAutoHideToolbar
+FULL_SCREEN_MASK = 1 << 14      # NSFullScreenWindowMask
+SHOW_REPLACE = 12               # NSTextFinderActionShowReplaceInterface
 
 
 def rgb(r, g, b, a=1.0):
@@ -129,12 +141,46 @@ def new_doc():
             "slug": u"", "excerpt": u"", "tags": [], "feature_image": None}
 
 
-def short_date(iso):
+def iso_seconds(iso):
+    """Seconds since 1970 for the site's UTC timestamps ('2026-11-09T14:00:00.000Z'), or None."""
     try:
-        t = time.strptime(iso[:19], "%Y-%m-%dT%H:%M:%S")
-        return unicode(time.strftime("%b %d, %Y", t)).replace(u" 0", u" ")
+        return calendar.timegm(time.strptime(iso[:19], "%Y-%m-%dT%H:%M:%S"))
     except (TypeError, ValueError):
+        return None
+
+
+def iso_from_seconds(seconds):
+    return time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(seconds))
+
+
+def short_date(iso):
+    seconds = iso_seconds(iso)
+    if seconds is None:
         return u""
+    return unicode(time.strftime("%b %d, %Y", time.localtime(seconds))).replace(u" 0", u" ")
+
+
+def short_time(iso):
+    """'Nov 9, 9:00 AM' for scheduled posts, where the hour matters."""
+    seconds = iso_seconds(iso)
+    if seconds is None:
+        return u""
+    hour = NSDateFormatter.alloc().init()
+    hour.setTimeStyle_(NSDateFormatterShortStyle)
+    return u"%s, %s" % (unicode(time.strftime("%b %d", time.localtime(seconds))).replace(u" 0", u" "),
+                        hour.stringFromDate_(NSDate.dateWithTimeIntervalSince1970_(seconds)))
+
+
+def long_date(iso):
+    """'Monday, November 9 at 9:00 AM', in this Mac's time zone and locale."""
+    seconds = iso_seconds(iso)
+    if seconds is None:
+        return u""
+    date = NSDate.dateWithTimeIntervalSince1970_(seconds)
+    day, hour = NSDateFormatter.alloc().init(), NSDateFormatter.alloc().init()
+    day.setDateFormat_(NSDateFormatter.dateFormatFromTemplate_options_locale_("EEEEMMMMd", 0, NSLocale.currentLocale()))
+    hour.setTimeStyle_(NSDateFormatterShortStyle)
+    return u"%s at %s" % (day.stringFromDate_(date), hour.stringFromDate_(date))
 
 
 # ---- images: local media, WebP conversion and a cache of remote images for the preview -------
@@ -147,6 +193,38 @@ def import_media(path):
         candidate, n = "%s-%d%s" % (name, n, ext.lower()), n + 1
     shutil.copyfile(path, os.path.join(MEDIA_DIR, candidate))
     return u"media:" + candidate
+
+
+def import_image_data(data, kind):
+    """Save pasted or dropped image data (PNG or TIFF) as a PNG in the media folder."""
+    if kind != NSPasteboardTypePNG:
+        rep = NSBitmapImageRep.imageRepWithData_(data)
+        data = rep.representationUsingType_properties_(NSPNGFileType, None) if rep else None
+    if not data:
+        return None
+    name, n = time.strftime("pasted-image-%Y-%m-%d-%H%M%S"), 2
+    candidate = name + ".png"
+    while os.path.exists(os.path.join(MEDIA_DIR, candidate)):
+        candidate, n = "%s-%d.png" % (name, n), n + 1
+    data.writeToFile_atomically_(os.path.join(MEDIA_DIR, candidate), True)
+    return u"media:" + candidate
+
+
+def pasteboard_images(pb):
+    """('files', [paths]) for image files, ('data', (data, type)) for raw image data, or None.
+    Raw data only counts when there's no text: copying from Pages or a web page also puts a
+    picture of the selection on the pasteboard."""
+    types = pb.types() or []
+    if NSFilenamesPboardType in types:
+        paths = [p for p in (pb.propertyListForType_(NSFilenamesPboardType) or [])
+                 if os.path.splitext(p)[1][1:].lower() in IMAGE_TYPES]
+        return ("files", paths) if paths else None
+    if NSStringPboardType in types:
+        return None
+    for kind in (NSPasteboardTypePNG, NSPasteboardTypeTIFF):
+        if kind in types:
+            return ("data", (pb.dataForType_(kind), kind))
+    return None
 
 
 def media_path(src):
@@ -207,6 +285,9 @@ def highlight(storage):
         para.setLineHeightMultiple_(1.22)
         para.setParagraphSpacing_(3)
         _STYLE["para"] = para
+        code_para = NSMutableParagraphStyle.alloc().init()
+        code_para.setLineHeightMultiple_(1.1)
+        _STYLE["code_para"] = code_para  # no paragraph spacing, so the shading has no gaps
     f, text = _STYLE["fonts"], storage.string()
     storage.beginEditing()
     storage.setAttributes_range_({NSFontAttributeName: f["base"], NSForegroundColorAttributeName: INK,
@@ -225,7 +306,7 @@ def highlight(storage):
     for kind, rx in _RULES:
         for m in rx.finditer(text):
             s, e = m.span()
-            if kind in ("fence", "card", "code"):
+            if kind in ("fence", "card", "code", "image"):  # also kept out of spell checking
                 code.append((s, e))
             if kind == "heading":
                 level = len(m.group(1))
@@ -233,6 +314,8 @@ def highlight(storage):
                 attr(s, s + level, color=FAINT)
             elif kind in ("fence", "card"):
                 attr(s, e, font=f["mono"], color=QUOTE if kind == "fence" else FAINT, bg=CODE_BG)
+                storage.addAttribute_value_range_(NSParagraphStyleAttributeName, _STYLE["code_para"],
+                                                  NSMakeRange(s, e - s))
             elif kind == "image":
                 attr(s, e, font=f["small"], color=FAINT)
             elif kind == "quote":
@@ -291,13 +374,168 @@ class PaperView(NSView):
         NSRectFill(rect)
 
 
+class EditorTextView(NSTextView):
+    """The Markdown editor. Image files and pictures dropped or pasted into it become image lines."""
+
+    def acceptableDragTypes(self):
+        return list(super(EditorTextView, self).acceptableDragTypes()) + [
+            NSFilenamesPboardType, NSPasteboardTypePNG, NSPasteboardTypeTIFF]
+
+    def dragOperationForDraggingInfo_type_(self, info, kind):
+        if pasteboard_images(info.draggingPasteboard()):
+            return NSDragOperationCopy
+        return super(EditorTextView, self).dragOperationForDraggingInfo_type_(info, kind)
+
+    def performDragOperation_(self, info):
+        found = pasteboard_images(info.draggingPasteboard())
+        if not found:
+            return super(EditorTextView, self).performDragOperation_(info)
+        point = self.convertPoint_fromView_(info.draggingLocation(), None)
+        self.cleanUpAfterDragOperation()
+        self.window().makeFirstResponder_(self)
+        self.setSelectedRange_(NSMakeRange(self.characterIndexForInsertionAtPoint_(point), 0))
+        self.delegate().insertImages_(found)
+        return True
+
+    def paste_(self, sender):
+        found = pasteboard_images(NSPasteboard.generalPasteboard())
+        if found:
+            self.delegate().insertImages_(found)
+        else:
+            super(EditorTextView, self).paste_(sender)
+
+
+class FeatureWell(NSView):
+    """The inspector's feature image, cropped to fill the way post cards show it. Click it to
+    choose a picture, or drop one on it."""
+
+    def initWithFrame_(self, frame):
+        self = super(FeatureWell, self).initWithFrame_(frame)
+        if self:
+            self.picture, self.target, self.lit = None, None, False
+            self.registerForDraggedTypes_([NSFilenamesPboardType, NSPasteboardTypePNG, NSPasteboardTypeTIFF])
+        return self
+
+    def setPicture(self, picture):
+        self.picture = picture
+        self.setNeedsDisplay_(True)
+
+    def drawRect_(self, rect):
+        frame = NSInsetRect(self.bounds(), 0.5, 0.5)
+        well = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(frame, 5, 5)
+        NSColor.colorWithCalibratedWhite_alpha_(0, 0.3).set()
+        well.fill()
+        if self.picture:
+            inner = NSInsetRect(frame, 3, 3)
+            size = self.picture.size()
+            scale = max(inner.size.width / max(size.width, 1), inner.size.height / max(size.height, 1))
+            w, h = size.width * scale, size.height * scale
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(inner, 3, 3).addClip()
+            self.picture.drawInRect_fromRect_operation_fraction_(
+                NSMakeRect(inner.origin.x + (inner.size.width - w) / 2, inner.origin.y + (inner.size.height - h) / 2,
+                           w, h), NSZeroRect, NSCompositeSourceOver, 1.0)
+            NSGraphicsContext.restoreGraphicsState()
+        else:
+            para = NSMutableParagraphStyle.alloc().init()
+            para.setAlignment_(NSCenterTextAlignment)
+            hint = NSAttributedString.alloc().initWithString_attributes_(
+                u"Drop a picture here, or click to choose one", {
+                    NSFontAttributeName: NSFont.systemFontOfSize_(11), NSParagraphStyleAttributeName: para,
+                    NSForegroundColorAttributeName: NSColor.colorWithCalibratedWhite_alpha_(1, 0.45)})
+            hint.drawInRect_(NSMakeRect(frame.origin.x + 10, frame.size.height / 2 - 8, frame.size.width - 20, 16))
+        if self.lit:
+            NSColor.alternateSelectedControlColor().set()
+            well.setLineWidth_(2.5)
+        else:
+            NSColor.colorWithCalibratedWhite_alpha_(1, 0.2).set()
+            well.setLineWidth_(1)
+        well.stroke()
+
+    def mouseDown_(self, event):
+        self.target.chooseFeature_(self)
+
+    def draggingEntered_(self, info):
+        if not pasteboard_images(info.draggingPasteboard()):
+            return NSDragOperationNone
+        self.lit = True
+        self.setNeedsDisplay_(True)
+        return NSDragOperationCopy
+
+    def draggingExited_(self, info):
+        self.lit = False
+        self.setNeedsDisplay_(True)
+
+    def performDragOperation_(self, info):
+        self.draggingExited_(info)
+        found = pasteboard_images(info.draggingPasteboard())
+        if found:
+            self.target.setFeatureFrom_(found)
+        return bool(found)
+
+
+class HUDButtonCell(NSButtonCell):
+    """A dark glass push button for the HUD inspector, like the ones in iPhoto's and QuickTime's HUDs."""
+
+    def drawBezelWithFrame_inView_(self, frame, view):
+        r = NSInsetRect(frame, 0.5, 1.5)
+        path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(r, r.size.height / 2, r.size.height / 2)
+        top, bottom = (0.16, 0.26) if self.isHighlighted() else (0.38, 0.2)
+        alpha = 0.9 if self.isEnabled() else 0.45
+        NSGradient.alloc().initWithStartingColor_endingColor_(
+            NSColor.colorWithCalibratedWhite_alpha_(top, alpha), NSColor.colorWithCalibratedWhite_alpha_(bottom, alpha)
+        ).drawInBezierPath_angle_(path, 90 if view.isFlipped() else -90)
+        NSColor.colorWithCalibratedWhite_alpha_(0.8, 0.45 if self.isEnabled() else 0.2).set()
+        path.setLineWidth_(1)
+        path.stroke()
+
+
+def hud_button(view, title, frame, target, action):
+    button = NSButton.alloc().initWithFrame_(frame)
+    button.setCell_(HUDButtonCell.alloc().init())
+    button.setBezelStyle_(NSRoundRectBezelStyle)
+    button.setBordered_(True)
+    para = NSMutableParagraphStyle.alloc().init()
+    para.setAlignment_(NSCenterTextAlignment)
+    shadow = NSShadow.alloc().init()
+    shadow.setShadowOffset_(NSMakeSize(0, -1))
+    shadow.setShadowColor_(NSColor.colorWithCalibratedWhite_alpha_(0, 0.6))
+    button.setAttributedTitle_(NSAttributedString.alloc().initWithString_attributes_(title, {
+        NSFontAttributeName: NSFont.systemFontOfSize_(11), NSForegroundColorAttributeName: NSColor.whiteColor(),
+        NSParagraphStyleAttributeName: para, NSShadowAttributeName: shadow}))
+    button.setTarget_(target)
+    button.setAction_(action)
+    view.addSubview_(button)
+    return button
+
+
+def hud_checkbox(view, title, frame, target, action):
+    box = NSButton.alloc().initWithFrame_(frame)
+    box.setButtonType_(NSSwitchButton)
+    box.setAttributedTitle_(NSAttributedString.alloc().initWithString_attributes_(title, {
+        NSFontAttributeName: NSFont.systemFontOfSize_(11),
+        NSForegroundColorAttributeName: NSColor.colorWithCalibratedWhite_alpha_(0.9, 1)}))
+    box.setTarget_(target)
+    box.setAction_(action)
+    view.addSubview_(box)
+    return box
+
+
+def small_text(text, color, line_break):
+    para = NSMutableParagraphStyle.alloc().init()
+    para.setLineBreakMode_(line_break)
+    return NSAttributedString.alloc().initWithString_attributes_(text, {
+        NSFontAttributeName: NSFont.systemFontOfSize_(11), NSForegroundColorAttributeName: color,
+        NSParagraphStyleAttributeName: para})
+
+
 class StatusStrip(NSView):
-    """The post's state above the title: a status pill plus what's saved where."""
+    """The post's state above the title: a status pill, what's saved where, and the post's path."""
 
     def initWithFrame_(self, frame):
         self = super(StatusStrip, self).initWithFrame_(frame)
         if self:
-            self.status, self.detail = "new", u""
+            self.status, self.detail, self.path = "new", u"", u""
         return self
 
     def drawRect_(self, rect):
@@ -306,8 +544,13 @@ class StatusStrip(NSView):
         label = STATUS_NAMES.get(self.status, u"Post").upper()
         w = pill_width(label)
         draw_pill(NSMakeRect(0, 5, w, 16), STATUS_COLORS.get(self.status, FAINT), label)
-        attrs = {NSFontAttributeName: NSFont.systemFontOfSize_(11), NSForegroundColorAttributeName: QUOTE}
-        NSAttributedString.alloc().initWithString_attributes_(self.detail, attrs).drawAtPoint_(NSMakePoint(w + 9, 6))
+        width, x = self.bounds().size.width, w + 9
+        detail = small_text(self.detail, QUOTE, NSLineBreakByTruncatingTail)
+        dw = min(detail.size().width + 1, width - x)
+        detail.drawInRect_(NSMakeRect(x, 6, dw, 15))
+        x += dw + 14
+        if self.path and width - x > 60:  # the slug loses its middle first; the status text never does
+            small_text(self.path, FAINT, NSLineBreakByTruncatingMiddle).drawInRect_(NSMakeRect(x, 6, width - x, 15))
 
 
 class PostCell(NSTextFieldCell):
@@ -378,9 +621,11 @@ class AppDelegate(NSObject):
                         (u"Open in Browser", "openInBrowser:", "o"), None,
                         (u"Discard Changes and Reload from Site…", "revertToRemote:", ""),
                         (u"Delete Draft…", "deleteDraft:", "")],
-            view_items=[(u"Show Inspector", "toggleInspector:", "i", NSCommandKeyMask | NSAlternateKeyMask),
+            view_items=[(u"Hide Post List", "togglePostList:", "s", NSCommandKeyMask | NSAlternateKeyMask),
+                        (u"Show Inspector", "toggleInspector:", "i", NSCommandKeyMask | NSAlternateKeyMask),
                         (u"Hide Preview", "togglePreview:", "p", NSCommandKeyMask | NSAlternateKeyMask), None,
                         (u"Refresh Post List", "refresh:", "r")])
+        self.addEditMenuItems()
         view_menu = NSApp.mainMenu().itemWithTitle_("View").submenu()
         view_menu.addItem_(NSMenuItem.separatorItem())
         sort_item = view_menu.addItemWithTitle_action_keyEquivalent_(u"Sort Posts By", None, "")
@@ -390,15 +635,114 @@ class AppDelegate(NSObject):
             it.setTag_(i)
             it.setTarget_(self)
         sort_item.setSubmenu_(sort_menu)
+        view_menu.addItem_(NSMenuItem.separatorItem())
+        full = view_menu.addItemWithTitle_action_keyEquivalent_(u"Enter Full Screen", "toggleFullScreen:", "f")
+        full.setKeyEquivalentModifierMask_(NSCommandKeyMask | NSControlKeyMask)
 
+        self.focus = False
         self.buildWindow()
         self.buildInspector()
+        self.outer.subviews()[0].setHidden_(self.defaults.boolForKey_("postListHidden"))
+        self.preview.setHidden_(self.defaults.boolForKey_("previewHidden"))
         self.window.makeKeyAndOrderFront_(None)
         self.layoutPanes()
         self.rebuildSidebar()
         last = self.defaults.stringForKey_("lastKey")
         self.showDoc((load_doc(last) if last else None) or self.createDoc())
         self.refresh_(None)
+        if self.defaults.boolForKey_("inspectorShown"):
+            self.toggleInspector_(None)
+        if self.defaults.arrayForKey_("DebugActions"):
+            self.performSelector_withObject_afterDelay_("runDebugActions:", None, 2.0)
+
+    def addEditMenuItems(self):
+        """Lion's Find (with the find bar) and Spelling and Grammar submenus, sent to the first responder."""
+        edit = NSApp.mainMenu().itemWithTitle_("Edit").submenu()
+        edit.addItem_(NSMenuItem.separatorItem())
+        cmd = NSCommandKeyMask
+        for title, items in (
+                (u"Find", ((u"Find…", "performFindPanelAction:", "f", cmd, NSFindPanelActionShowFindPanel),
+                           (u"Find and Replace…", "performFindPanelAction:", "f", cmd | NSAlternateKeyMask, SHOW_REPLACE),
+                           (u"Find Next", "performFindPanelAction:", "g", cmd, NSFindPanelActionNext),
+                           (u"Find Previous", "performFindPanelAction:", "g", cmd | NSShiftKeyMask,
+                            NSFindPanelActionPrevious),
+                           (u"Use Selection for Find", "performFindPanelAction:", "e", cmd, NSFindPanelActionSetFindString),
+                           (u"Jump to Selection", "centerSelectionInVisibleArea:", "j", cmd, 0))),
+                (u"Spelling and Grammar", ((u"Show Spelling and Grammar", "showGuessPanel:", ":", cmd, 0),
+                                           (u"Check Document Now", "checkSpelling:", ";", cmd, 0), None,
+                                           (u"Check Spelling While Typing", "toggleContinuousSpellChecking:", "", 0, 0),
+                                           (u"Check Grammar With Spelling", "toggleGrammarChecking:", "", 0, 0)))):
+            sub = NSMenu.alloc().initWithTitle_(title)
+            for spec in items:
+                if spec is None:
+                    sub.addItem_(NSMenuItem.separatorItem())
+                    continue
+                name, action, key, mask, tag = spec
+                item = sub.addItemWithTitle_action_keyEquivalent_(name, action, key)
+                if mask:
+                    item.setKeyEquivalentModifierMask_(mask)
+                item.setTag_(tag)
+            edit.addItemWithTitle_action_keyEquivalent_(title, None, "").setSubmenu_(sub)
+
+    def runDebugActions_(self, _):
+        """For checking states that need a click, over SSH: `defaults write page.zepto.planchette
+        DebugActions -array inspector 'title: more words'` runs them once, two seconds after launch."""
+        actions = list(self.defaults.arrayForKey_("DebugActions") or [])
+        self.defaults.removeObjectForKey_("DebugActions")
+        for action in actions:
+            name, _, arg = unicode(action).partition(u":")
+            arg = arg.strip()
+            if name == "inspector":
+                self.inspector.setHidesOnDeactivate_(False)  # it would hide while we're in the background
+                self.toggleInspector_(None)
+            elif name == "preview":
+                self.togglePreview_(None)
+            elif name == "open":
+                self.openKey(arg)
+            elif name == "size":
+                w, h = [float(x) for x in arg.split(",")]
+                frame = self.window.frame()
+                self.window.setFrame_display_(NSMakeRect(frame.origin.x, frame.origin.y + frame.size.height - h,
+                                                         w, h), True)
+            elif name == "title":
+                self.window.makeFirstResponder_(self.titleField)
+                editor = self.titleField.currentEditor()
+                editor.setSelectedRange_(NSMakeRange(len(editor.string()), 0))
+                editor.insertText_(arg)
+            elif name == "new":
+                self.newPost_(None)
+            elif name == "type":
+                self.window.makeFirstResponder_(self.textView)
+                self.textView.insertText_(arg.replace(u"\\n", u"\n"))
+            elif name in ("paste-file", "paste-png"):  # a private pasteboard, never the user's clipboard
+                pb = NSPasteboard.pasteboardWithUniqueName()
+                if name == "paste-file":
+                    pb.declareTypes_owner_([NSFilenamesPboardType, NSStringPboardType], None)
+                    pb.setPropertyList_forType_([arg], NSFilenamesPboardType)
+                    pb.setString_forType_(os.path.basename(arg), NSStringPboardType)
+                else:
+                    pb.declareTypes_owner_([NSPasteboardTypeTIFF], None)
+                    pb.setData_forType_(NSImage.alloc().initWithContentsOfFile_(arg).TIFFRepresentation(),
+                                        NSPasteboardTypeTIFF)
+                found = pasteboard_images(pb)
+                print("debug %s found %s" % (name, repr(found)[:200]))
+                if found:
+                    self.insertImages_(found)
+                pb.releaseGlobally()
+            elif name == "feature":
+                self.setFeature(import_media(arg))
+            elif name == "later":
+                self.laterBox.setState_(NSOffState if self.laterBox.state() == NSOnState else NSOnState)
+                self.toggleLater_(self.laterBox)
+            elif name == "find":
+                item = NSMenuItem.alloc().init()
+                item.setTag_(SHOW_REPLACE if arg == "replace" else NSFindPanelActionShowFindPanel)
+                self.window.makeFirstResponder_(self.textView)
+                self.textView.performFindPanelAction_(item)
+            elif name == "focus":
+                self.setFocusMode(arg != "off")
+            elif name == "postlist":
+                self.togglePostList_(None)
 
     # ---- window ------------------------------------------------------------------------------------
     def buildWindow(self):
@@ -408,6 +752,8 @@ class AppDelegate(NSObject):
             NSMakeRect(0, 0, 1240, 740), mask, NSBackingStoreBuffered, False)
         w.setMinSize_(NSMakeSize(860, 460))
         w.setContentBorderThickness_forEdge_(BAR, NSMinYEdge)
+        w.setCollectionBehavior_(w.collectionBehavior() | FULL_SCREEN_PRIMARY)
+        w.setDelegate_(self)
         w.setFrameAutosaveName_("PlanchetteMain")
         if not w.setFrameUsingName_("PlanchetteMain"):
             w.center()
@@ -425,6 +771,7 @@ class AppDelegate(NSObject):
         outer.setVertical_(True)
         outer.setDividerStyle_(NSSplitViewDividerStyleThin)
         outer.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
+        outer.setDelegate_(self)
         self.outer = outer
 
         sidebar = NSScrollView.alloc().initWithFrame_(NSMakeRect(0, 0, SIDEBAR_WIDTH, ch - BAR))
@@ -453,6 +800,7 @@ class AppDelegate(NSObject):
         inner = NSSplitView.alloc().initWithFrame_(NSMakeRect(0, 0, cw - SIDEBAR_WIDTH - 1, ch - BAR))
         inner.setVertical_(True)
         inner.setDividerStyle_(NSSplitViewDividerStyleThin)
+        inner.setDelegate_(self)
         self.inner = inner
 
         editor = PaperView.alloc().initWithFrame_(NSMakeRect(0, 0, 500, ch - BAR))
@@ -467,8 +815,9 @@ class AppDelegate(NSObject):
         title.setFont_(NSFont.fontWithName_size_("Hoefler Text", 30) or NSFont.systemFontOfSize_(26))
         title.setTextColor_(INK)
         title.cell().setPlaceholderString_(u"Title")
-        title.cell().setScrollable_(True)
-        title.cell().setLineBreakMode_(NSLineBreakByTruncatingTail)
+        title.cell().setScrollable_(False)  # long titles wrap and the header grows (see editorResized_)
+        title.cell().setWraps_(True)
+        title.cell().setLineBreakMode_(NSLineBreakByWordWrapping)
         title.setAutoresizingMask_(NSViewWidthSizable | NSViewMinYMargin)
         title.setDelegate_(self)
         editor.addSubview_(title)
@@ -485,7 +834,7 @@ class AppDelegate(NSObject):
         scroll.setDrawsBackground_(False)
         scroll.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
         size = scroll.contentSize()
-        tv = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, size.width, size.height))
+        tv = EditorTextView.alloc().initWithFrame_(NSMakeRect(0, 0, size.width, size.height))
         tv.setMinSize_(NSMakeSize(0, size.height))
         tv.setMaxSize_(NSMakeSize(1e7, 1e7))
         tv.setVerticallyResizable_(True)
@@ -503,9 +852,12 @@ class AppDelegate(NSObject):
         tv.setAutomaticQuoteSubstitutionEnabled_(False)
         tv.setAutomaticDashSubstitutionEnabled_(False)
         tv.setContinuousSpellCheckingEnabled_(True)
+        tv.setUsesFindBar_(True)
+        tv.setIncrementalSearchingEnabled_(True)
         tv.setDelegate_(self)
         scroll.setDocumentView_(tv)
         editor.addSubview_(scroll)
+        title.setNextKeyView_(tv)
         self.textView, self.editorScroll, self.editorPane = tv, scroll, editor
         clip = scroll.contentView()
         clip.setPostsBoundsChangedNotifications_(True)
@@ -538,34 +890,113 @@ class AppDelegate(NSObject):
         content.addSubview_(self.words)
 
     def layoutPanes(self):
+        self.restoring = True
         size = self.outer.frame().size
         sidebar, inner = self.outer.subviews()
-        sidebar.setFrame_(NSMakeRect(0, 0, SIDEBAR_WIDTH, size.height))
-        inner.setFrame_(NSMakeRect(SIDEBAR_WIDTH + 1, 0, size.width - SIDEBAR_WIDTH - 1, size.height))
+        left = 0 if sidebar.isHidden() else min(self.defaults.floatForKey_("sidebarWidth") or SIDEBAR_WIDTH, 360)
+        gap = self.outer.dividerThickness() if left else 0
+        sidebar.setFrame_(NSMakeRect(0, 0, left, size.height))
+        inner.setFrame_(NSMakeRect(left + gap, 0, size.width - left - gap, size.height))
         self.outer.adjustSubviews()
+        self.restoring = False
         self.layoutEditor()
 
     def layoutEditor(self):
+        self.restoring = True
         size = self.inner.frame().size
         editor, preview = self.inner.subviews()
         if preview.isHidden():
             editor.setFrame_(NSMakeRect(0, 0, size.width, size.height))
         else:
-            left = int(size.width * 0.52)
+            fraction = min(0.75, max(0.35, self.defaults.floatForKey_("editorFraction") or 0.52))
+            left = int(size.width * fraction)
             editor.setFrame_(NSMakeRect(0, 0, left, size.height))
             preview.setFrame_(NSMakeRect(left + 1, 0, size.width - left - 1, size.height))
         self.inner.adjustSubviews()
+        self.restoring = False
         self.editorResized_(None)
 
+    def splitView_constrainMinCoordinate_ofSubviewAt_(self, split, proposed, index):
+        return max(proposed, 180 if split == self.outer else 340)
+
+    def splitView_constrainMaxCoordinate_ofSubviewAt_(self, split, proposed, index):
+        return min(proposed, 360 if split == self.outer else split.frame().size.width - 280)
+
+    def splitView_resizeSubviewsWithOldSize_(self, split, old):
+        """When the window resizes, the post list keeps its width and the writing area takes the rest."""
+        if split != self.outer:
+            split.adjustSubviews()
+            return
+        sidebar, inner = split.subviews()
+        size = split.frame().size
+        left = 0 if sidebar.isHidden() else sidebar.frame().size.width
+        gap = split.dividerThickness() if left else 0
+        sidebar.setFrame_(NSMakeRect(0, 0, left, size.height))
+        inner.setFrame_(NSMakeRect(left + gap, 0, max(0, size.width - left - gap), size.height))
+
+    def splitViewDidResizeSubviews_(self, note):
+        """Remember where the user put the dividers (not while we lay them out ourselves)."""
+        split = note.object()
+        if getattr(self, "restoring", True) or self.focus or not self.window.isVisible():
+            return
+        if split == self.outer:
+            sidebar = split.subviews()[0]
+            if not sidebar.isHidden() and sidebar.frame().size.width >= 180:
+                self.defaults.setFloat_forKey_(sidebar.frame().size.width, "sidebarWidth")
+        elif not self.preview.isHidden() and split.frame().size.width > 0:
+            self.defaults.setFloat_forKey_(self.editorPane.frame().size.width / split.frame().size.width,
+                                           "editorFraction")
+
+    def togglePostList_(self, sender):
+        sidebar = self.outer.subviews()[0]
+        sidebar.setHidden_(not sidebar.isHidden())
+        if not self.focus:
+            self.defaults.setBool_forKey_(sidebar.isHidden(), "postListHidden")
+        self.layoutPanes()
+
+    # ---- full screen: just the page, the toolbar slides in with the menu bar --------------------------
+    def setFocusMode(self, on):
+        self.focus = on
+        if on:
+            self.outer.subviews()[0].setHidden_(True)
+            self.preview.setHidden_(True)
+            self.inspector.orderOut_(None)
+        else:
+            self.outer.subviews()[0].setHidden_(self.defaults.boolForKey_("postListHidden"))
+            self.preview.setHidden_(self.defaults.boolForKey_("previewHidden"))
+        self.layoutPanes()
+        self.updatePreview_(None)
+
+    def windowWillEnterFullScreen_(self, note):
+        self.setFocusMode(True)
+
+    def windowWillExitFullScreen_(self, note):
+        self.setFocusMode(False)
+
+    @objc.typedSelector("Q@:@Q")
+    def window_willUseFullScreenPresentationOptions_(self, window, options):
+        return options | AUTO_HIDE_TOOLBAR
+
     def editorResized_(self, note):
-        """Keep the text in a centered column of readable width, aligned with the title."""
+        """Keep the text in a centered column of readable width, aligned with the title, and give
+        the title as many lines as it needs."""
+        if getattr(self, "laying_out", False):
+            return  # moving the scroll view below re-posts the clip view's frame notification
+        self.laying_out = True
         width = self.editorPane.frame().size.width
         height = self.editorPane.frame().size.height
         margin = max(34, (width - COLUMN) / 2.0)
+        column = width - 2 * margin
         self.textView.setTextContainerInset_(NSMakeSize(margin - 6, 12))
-        for view, y, h, dx in ((self.strip, height - 40, 26, 0), (self.titleField, height - 84, 40, -2),
-                               (self.rule, height - 94, 1, 0)):
-            view.setFrame_(NSMakeRect(margin + dx, y, width - 2 * margin, h))
+        needed = self.titleField.cell().cellSizeForBounds_(NSMakeRect(0, 0, column + 4, 1e5)).height
+        title_h = max(40, int(needed + 0.99) + 4)
+        title_y = height - 44 - title_h
+        self.strip.setFrame_(NSMakeRect(margin, height - 40, column, 26))
+        self.titleField.setFrame_(NSMakeRect(margin - 2, title_y, column + 4, title_h))
+        self.rule.setFrame_(NSMakeRect(margin, title_y - 10, column, 1))
+        self.editorScroll.setFrame_(NSMakeRect(0, 0, width, max(0, title_y - 14)))
+        self.editorPane.setNeedsDisplay_(True)
+        self.laying_out = False
 
     def barLabel(self, frame, align):
         label = NSTextField.alloc().initWithFrame_(frame)
@@ -614,7 +1045,7 @@ class AppDelegate(NSObject):
                     "refresh": (u"Refresh", "refresh:", "refresh", None),
                     "browser": (u"Open in Browser", "openInBrowser:", "globe", None),
                     "primary": (u"Save Draft", "save:", None, 96),
-                    "secondary": (u"Publish…", "publishOrUnpublish:", None, 92)}.get(ident)
+                    "secondary": (u"Publish…", "publishOrUnpublish:", None, 100)}.get(ident)
             if not spec:
                 return None
             label, action, glyph, width = spec
@@ -667,6 +1098,8 @@ class AppDelegate(NSObject):
             item.setTitle_(u"Hide Inspector" if self.inspector.isVisible() else u"Show Inspector")
         elif action == "togglePreview:":
             item.setTitle_(u"Show Preview" if self.preview.isHidden() else u"Hide Preview")
+        elif action == "togglePostList:":
+            item.setTitle_(u"Show Post List" if self.outer.subviews()[0].isHidden() else u"Hide Post List")
         elif action == "publishOrUnpublish:":
             item.setTitle_(self.secondaryButton.title())
         elif action == "save:":
@@ -706,10 +1139,10 @@ class AppDelegate(NSObject):
             status = p["status"] if p["status"] in rows else "draft"
             dirty = bool(cached.get("dirty"))
             when = p.get("published_at") if status in ("published", "scheduled") else p.get("updated_at")
-            prefix = {"draft": u"Edited ", "scheduled": u"Scheduled for "}.get(status, u"")
+            prefix = {"draft": u"Edited ", "scheduled": u"Goes live "}.get(status, u"")
             rows[status].append({"key": p["id"], "status": status, "dirty": dirty,
                                  "title": (cached.get("title") if dirty else p.get("title")) or u"Untitled",
-                                 "sub": prefix + short_date(when),
+                                 "sub": prefix + (short_time(when) if status == "scheduled" else short_date(when)),
                                  "edited": p.get("updated_at") or u"", "published": p.get("published_at") or u""})
         sort = self.sortKey()
         self.groups = []
@@ -825,7 +1258,8 @@ class AppDelegate(NSObject):
             if cached:
                 self.showDoc(cached)
             return
-        if cached and cached.get("base_updated_at") == summary["updated_at"]:
+        if cached and cached.get("base_updated_at") == summary["updated_at"] and (
+                cached.get("dirty") or cached.get("converter") == html2md.VERSION):
             self.showDoc(cached)
             return
         if cached and cached.get("dirty"):
@@ -854,7 +1288,9 @@ class AppDelegate(NSObject):
                     "markdown": html2md.convert(p.get("html") or u""), "status": p["status"],
                     "base_updated_at": p["updated_at"], "url": p.get("url"), "dirty": False, "uploads": {},
                     "saved_at": None, "slug": p.get("slug") or u"", "excerpt": p.get("custom_excerpt") or u"",
-                    "tags": [t["name"] for t in p.get("tags") or []], "feature_image": p.get("feature_image")}
+                    "tags": [t["name"] for t in p.get("tags") or []], "feature_image": p.get("feature_image"),
+                    "published_at": p.get("published_at"), "publish_later": p["status"] == "scheduled",
+                    "converter": html2md.VERSION}
 
         def done(doc, error):
             self.setIdle()
@@ -871,12 +1307,15 @@ class AppDelegate(NSObject):
         for k, v in new_doc().items():
             if k != "key":
                 doc.setdefault(k, v)
+        if self.doc and self.doc["key"] != doc["key"]:
+            self.rememberPlace_(None)
         self.doc = doc
         self.loading_doc = True
         self.titleField.setStringValue_(doc.get("title") or u"")
+        self.editorResized_(None)
         self.textView.setString_(doc.get("markdown") or u"")
         highlight(self.textView.textStorage())
-        self.textView.scrollRangeToVisible_(NSMakeRange(0, 0))
+        self.restorePlace()
         self.loadInspector()
         self.loading_doc = False
         self.defaults.setObject_forKey_(doc["key"], "lastKey")
@@ -910,6 +1349,15 @@ class AppDelegate(NSObject):
             self.inspectorEdited()
         elif note.object() == self.titleField:
             self.edited()
+            self.editorResized_(None)
+
+    def control_textView_doCommandBySelector_(self, control, tv, selector):
+        """Return or Tab in the title moves on to the post's text, like Mail's subject field."""
+        if control == self.titleField and selector in ("insertNewline:", "insertTab:"):
+            self.window.makeFirstResponder_(self.textView)
+            self.textView.setSelectedRange_(NSMakeRange(0, 0))
+            return True
+        return False
 
     def controlTextDidEndEditing_(self, note):
         if note.object() == self.tagsField:
@@ -919,7 +1367,7 @@ class AppDelegate(NSObject):
         if self.loading_doc or not self.doc:
             return
         was_dirty = self.doc.get("dirty")
-        self.doc["title"] = self.titleField.stringValue()
+        self.doc["title"] = re.sub(r"\s*[\r\n]+\s*", u" ", self.titleField.stringValue())
         self.doc["markdown"] = self.textView.string()
         self.markDirty(was_dirty)
 
@@ -946,22 +1394,24 @@ class AppDelegate(NSObject):
             detail = u"Only on this Mac — Save Draft puts it on %s" % self.siteName()
         elif d.get("dirty"):
             detail = u"Unsaved changes" + (u" — readers see the old version until you Update" if live else u"")
+        elif status == "scheduled":
+            detail = u"Goes live %s" % long_date(d.get("published_at"))
         else:
             detail = u"In sync with %s" % self.siteName() + (u" · saved %s" % d["saved_at"] if d.get("saved_at") else u"")
-        if d.get("slug") and d.get("id"):
-            detail += u"   /%s/" % d["slug"]
         self.strip.status, self.strip.detail = status, detail
+        self.strip.path = u"/%s/" % d["slug"] if d.get("slug") and d.get("id") else u""
         self.strip.setNeedsDisplay_(True)
         self.primaryButton.setTitle_(u"Update" if live else u"Save Draft")
-        self.secondaryButton.setTitle_(u"Unpublish…" if live else u"Publish…")
+        self.secondaryButton.setTitle_({"published": u"Unpublish…", "scheduled": u"Unschedule…"}.get(
+            status, u"Schedule…" if d.get("publish_later") else u"Publish…"))
         self.primaryButton.setEnabled_(self.canDo("save:"))
         self.secondaryButton.setEnabled_(not self.busy)
         self.browserButton.setEnabled_(bool(d.get("id")))
         if not self.busy:
             self.setStatus_(u"")
         words = len((d.get("markdown") or u"").split())
-        self.words.setStringValue_(u"%d word%s · %d min read" % (words, u"" if words == 1 else u"s",
-                                                                    max(1, int(round(words / 220.0)))))
+        self.words.setStringValue_(u"%d word%s" % (words, u"" if words == 1 else u"s") + (
+            u" · %d min read" % max(1, int(round(words / 220.0))) if words else u""))
 
     def setStatus_(self, text):
         self.status.setStringValue_(text)
@@ -1012,6 +1462,54 @@ class AppDelegate(NSObject):
     def editorScrolled_(self, note):
         if self.preview_ready:
             self.preview.stringByEvaluatingJavaScriptFromString_(u"scrollToRatio(%f);" % self.editorScrollRatio())
+        self.placeChanged()
+
+    # ---- where you were: scroll position and selection per post, for the 40 most recent -------------
+    def textViewDidChangeSelection_(self, note):
+        if note.object() == self.textView:
+            self.placeChanged()
+
+    def placeChanged(self):
+        if not self.loading_doc:
+            NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "rememberPlace:", None)
+            self.performSelector_withObject_afterDelay_("rememberPlace:", None, 0.5)
+
+    def topCharacter(self):
+        lm, container = self.textView.layoutManager(), self.textView.textContainer()
+        visible = self.editorScroll.contentView().documentVisibleRect()
+        y = visible.origin.y - self.textView.textContainerOrigin().y
+        if y <= 0:
+            return 0
+        return lm.characterIndexForGlyphAtIndex_(lm.glyphIndexForPoint_inTextContainer_(NSMakePoint(10, y + 1), container))
+
+    def rememberPlace_(self, _):
+        if not self.doc or self.loading_doc:
+            return
+        sel = self.textView.selectedRange()
+        places = dict(self.defaults.dictionaryForKey_("places") or {})
+        places[self.doc["key"]] = [self.topCharacter(), sel.location, sel.length, time.time()]
+        for key in sorted(places, key=lambda k: places[k][3])[:max(0, len(places) - 40)]:
+            del places[key]
+        self.defaults.setObject_forKey_(places, "places")
+
+    def restorePlace(self):
+        tv, clip = self.textView, self.editorScroll.contentView()
+        length = len(tv.string())
+        place = (self.defaults.dictionaryForKey_("places") or {}).get(self.doc["key"])
+        top, loc, n = [min(int(x), length) for x in list(place)[:3]] if place else (0, 0, 0)
+        tv.setSelectedRange_(NSMakeRange(loc, min(n, length - loc)))
+        y = 0
+        if top > 0:
+            lm = tv.layoutManager()
+            lm.ensureLayoutForCharacterRange_(NSMakeRange(0, top))
+            line = lm.lineFragmentRectForGlyphAtIndex_effectiveRange_(lm.glyphIndexForCharacterAtIndex_(min(top, length - 1)), None)
+            line = line[0] if isinstance(line, tuple) else line
+            y = line.origin.y + tv.textContainerOrigin().y
+        clip.scrollToPoint_(clip.constrainScrollPoint_(NSMakePoint(0, y)))
+        self.editorScroll.reflectScrolledClipView_(clip)
+
+    def applicationWillTerminate_(self, note):
+        self.rememberPlace_(None)
 
     def remoteImage(self, url):
         """Lion's WebKit can't fetch HTTPS (or decode WebP); use a LionKit-downloaded copy instead."""
@@ -1039,25 +1537,53 @@ class AppDelegate(NSObject):
     # ---- inspector (HUD panel) -------------------------------------------------------------------------
     def buildInspector(self):
         p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 300, 470),
+            NSMakeRect(0, 0, 300, 588),
             NSTitledWindowMask | NSClosableWindowMask | NSUtilityWindowMask | NSHUDWindowMask,
             NSBackingStoreBuffered, False)
         p.setTitle_(u"Post Info")
         p.setFloatingPanel_(True)
         p.setHidesOnDeactivate_(True)
+        p.setDelegate_(self)
         v = p.contentView()
         gray = NSColor.colorWithCalibratedWhite_alpha_(0.6, 1)
-        hud_label(v, u"URL SLUG", NSMakeRect(14, 438, 270, 15))
-        self.slugField = NSTextField.alloc().initWithFrame_(NSMakeRect(16, 412, 268, 22))
+
+        hud_label(v, u"URL SLUG", NSMakeRect(14, 560, 270, 15))
+        self.slugField = NSTextField.alloc().initWithFrame_(NSMakeRect(16, 534, 268, 22))
         self.slugField.cell().setPlaceholderString_(u"generated from the title")
         self.slugField.setDelegate_(self)
         v.addSubview_(self.slugField)
-        self.urlLabel = hud_label(v, u"", NSMakeRect(14, 392, 270, 15), 10.5, gray)
+        self.urlLabel = hud_label(v, u"", NSMakeRect(14, 513, 218, 15), 10.5, gray)
+        self.urlLabel.cell().setLineBreakMode_(NSLineBreakByTruncatingMiddle)
+        self.copyButton = hud_button(v, u"Copy", NSMakeRect(238, 511, 46, 19), self, "copyURL:")
+        self.copyButton.setToolTip_(u"Copy the post\u2019s address")
 
-        hud_label(v, u"EXCERPT", NSMakeRect(14, 362, 200, 15))
-        self.excerptCount = hud_label(v, u"", NSMakeRect(214, 362, 70, 15), 10.5, gray)
+        hud_label(v, u"PUBLISH DATE", NSMakeRect(14, 484, 270, 15))
+        self.laterBox = hud_checkbox(v, u"Publish later:", NSMakeRect(14, 459, 112, 18), self, "toggleLater:")
+        self.dateCaption = hud_label(v, u"", NSMakeRect(14, 460, 110, 15), 11, NSColor.colorWithCalibratedWhite_alpha_(0.9, 1))
+        picker = NSDatePicker.alloc().initWithFrame_(NSMakeRect(128, 457, 156, 22))
+        picker.setDatePickerStyle_(NSTextFieldAndStepperDatePickerStyle)
+        picker.setDatePickerElements_(NSYearMonthDayDatePickerElementFlag | NSHourMinuteDatePickerElementFlag)
+        picker.setDrawsBackground_(True)
+        picker.setBackgroundColor_(NSColor.whiteColor())
+        picker.setFont_(NSFont.systemFontOfSize_(11))
+        picker.setTarget_(self)
+        picker.setAction_("datePicked:")
+        v.addSubview_(picker)
+        self.datePicker = picker
+        self.dateHint = hud_label(v, u"", NSMakeRect(14, 421, 272, 30), 10.5, gray)
+        self.dateHint.cell().setWraps_(True)
+
+        hud_label(v, u"TAGS", NSMakeRect(14, 395, 270, 15))
+        tags = NSTokenField.alloc().initWithFrame_(NSMakeRect(16, 347, 268, 44))
+        tags.setDelegate_(self)
+        tags.cell().setPlaceholderString_(u"Type a tag and press Return")
+        v.addSubview_(tags)
+        self.tagsField = tags
+
+        hud_label(v, u"EXCERPT", NSMakeRect(14, 318, 200, 15))
+        self.excerptCount = hud_label(v, u"", NSMakeRect(214, 318, 70, 15), 10.5, gray)
         self.excerptCount.setAlignment_(NSRightTextAlignment)
-        scroll = NSScrollView.alloc().initWithFrame_(NSMakeRect(16, 272, 268, 86))
+        scroll = NSScrollView.alloc().initWithFrame_(NSMakeRect(16, 228, 268, 86))
         scroll.setBorderType_(NSBezelBorder)
         scroll.setHasVerticalScroller_(True)
         ex = NSTextView.alloc().initWithFrame_(NSMakeRect(0, 0, 262, 86))
@@ -1070,27 +1596,17 @@ class AppDelegate(NSObject):
         v.addSubview_(scroll)
         self.excerptView = ex
 
-        hud_label(v, u"TAGS", NSMakeRect(14, 244, 270, 15))
-        tags = NSTokenField.alloc().initWithFrame_(NSMakeRect(16, 196, 268, 44))
-        tags.setDelegate_(self)
-        tags.cell().setPlaceholderString_(u"Type a tag and press Return")
-        v.addSubview_(tags)
-        self.tagsField = tags
-
-        hud_label(v, u"FEATURE IMAGE", NSMakeRect(14, 170, 270, 15))
-        well = NSImageView.alloc().initWithFrame_(NSMakeRect(16, 44, 268, 122))
-        well.setImageFrameStyle_(NSImageFrameGrayBezel)
-        well.setImageScaling_(NSImageScaleProportionallyUpOrDown)
-        v.addSubview_(well)
-        self.featureWell = well
-        for title, x, action in ((u"Choose…", 16, "chooseFeature:"), (u"Remove", 112, "removeFeature:")):
-            b = NSButton.alloc().initWithFrame_(NSMakeRect(x, 10, 90, 26))
-            b.setBezelStyle_(NSRoundRectBezelStyle)
-            b.setTitle_(title)
-            b.setTarget_(self)
-            b.setAction_(action)
-            v.addSubview_(b)
+        hud_label(v, u"FEATURE IMAGE", NSMakeRect(14, 199, 270, 15))
+        self.featureWell = FeatureWell.alloc().initWithFrame_(NSMakeRect(16, 44, 268, 151))
+        self.featureWell.target = self
+        v.addSubview_(self.featureWell)
+        hud_button(v, u"Choose\u2026", NSMakeRect(16, 12, 86, 22), self, "chooseFeature:")
+        self.removeButton = hud_button(v, u"Remove", NSMakeRect(108, 12, 86, 22), self, "removeFeature:")
         self.inspector = p
+
+    def windowWillClose_(self, note):
+        if note.object() == self.inspector:
+            self.defaults.setBool_forKey_(False, "inspectorShown")
 
     def tokenField_completionsForSubstring_indexOfToken_indexOfSelectedItem_(self, field, sub, index, selected):
         return [t for t in self.site_tags if t.lower().startswith(sub.lower())]
@@ -1101,18 +1617,80 @@ class AppDelegate(NSObject):
         self.excerptView.setString_(d.get("excerpt") or u"")
         self.tagsField.setObjectValue_(d.get("tags") or [])
         self.updateInspectorLabels()
-        self.featureWell.setImage_(None)
+        self.loadPublishDate()
+        picture = None
         if d.get("feature_image"):
             url = self.imageURL(d["feature_image"])
             if url.startswith("file://"):
-                self.featureWell.setImage_(NSImage.alloc().initWithContentsOfURL_(NSURL.URLWithString_(url)))
+                picture = NSImage.alloc().initWithContentsOfURL_(NSURL.URLWithString_(url))
+        self.featureWell.setPicture(picture)
+        self.removeButton.setEnabled_(bool(d.get("feature_image")))
+
+    def postURL(self):
+        """The address readers use: the site's own for published posts, otherwise where it will be."""
+        d = self.doc
+        if d.get("status") == "published" and d.get("url"):
+            return d["url"]
+        return u"%s/%s/" % (self.site().rstrip(u"/") or u"https://your-blog", d.get("slug") or u"(from-title)")
 
     def updateInspectorLabels(self):
         d = self.doc
         n = len(d.get("excerpt") or u"")
         self.excerptCount.setStringValue_(u"%d / %d" % (n, EXCERPT_MAX))
         self.excerptCount.setTextColor_(rgb(255, 120, 90) if n > EXCERPT_MAX else NSColor.colorWithCalibratedWhite_alpha_(0.6, 1))
-        self.urlLabel.setStringValue_(u"%s/%s/" % (self.siteName(), d.get("slug") or u"(from title)"))
+        self.urlLabel.setStringValue_(re.sub(r"^https?://", u"", self.postURL()))
+        self.copyButton.setEnabled_(bool(d.get("slug")) or d.get("status") == "published")
+
+    def copyURL_(self, sender):
+        pb = NSPasteboard.generalPasteboard()
+        pb.declareTypes_owner_([NSStringPboardType], None)
+        pb.setString_forType_(self.postURL(), NSStringPboardType)
+        self.setStatus_(u"Copied %s" % self.postURL())
+
+    # ---- publish date: scheduling drafts, moving scheduled and published posts -----------------------
+    def loadPublishDate(self):
+        d = self.doc
+        status = d.get("status") or "new"
+        live = status in ("scheduled", "published")
+        if live and not d.get("published_at"):  # copies pulled before 0.4 didn't keep the date
+            d["published_at"] = (self.remoteSummary(d.get("id")) or {}).get("published_at")
+        seconds = iso_seconds(d.get("published_at"))
+        if seconds is None:  # suggest tomorrow morning
+            t = time.localtime(time.time() + 86400)
+            seconds = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 9, 0, 0, 0, 0, -1))
+        self.laterBox.setHidden_(live)
+        self.laterBox.setState_(NSOnState if d.get("publish_later") else NSOffState)
+        self.dateCaption.setHidden_(not live)
+        self.dateCaption.setStringValue_(u"Goes live:" if status == "scheduled" else u"Published:")
+        self.datePicker.setMinDate_(None if status == "published" else NSDate.dateWithTimeIntervalSinceNow_(SCHEDULE_LEAD))
+        self.datePicker.setDateValue_(NSDate.dateWithTimeIntervalSince1970_(seconds))
+        self.datePicker.setEnabled_(live or bool(d.get("publish_later")))
+        self.dateHint.setStringValue_({
+            "scheduled": u"Your site publishes it at this time, even if this Mac is asleep. Unschedule\u2026 makes it a draft again.",
+            "published": u"Changing the date moves the post in your site\u2019s timeline; Update saves it.",
+        }.get(status, u"Schedule\u2026 hands it to your site, which publishes it at this time, even if this Mac is asleep."
+              if d.get("publish_later") else u"Publish\u2026 puts it on your site right away."))
+
+    def pickedDate(self):
+        return iso_from_seconds(self.datePicker.dateValue().timeIntervalSince1970())
+
+    def toggleLater_(self, sender):
+        """Only a plan until Schedule… is chosen, so this doesn't count as an unsaved change."""
+        self.doc["publish_later"] = sender.state() == NSOnState
+        self.doc["published_at"] = self.pickedDate() if self.doc["publish_later"] else None
+        save_doc(self.doc)
+        self.loadPublishDate()
+        self.updateState()
+
+    def datePicked_(self, sender):
+        if self.doc.get("status") in ("scheduled", "published"):
+            was_dirty = self.doc.get("dirty")
+            self.doc["published_at"] = self.pickedDate()
+            self.markDirty(was_dirty)
+        else:
+            self.doc["published_at"] = self.pickedDate()
+            save_doc(self.doc)
+            self.updateState()
 
     def inspectorEdited(self):
         if self.loading_doc or not self.doc:
@@ -1132,12 +1710,23 @@ class AppDelegate(NSObject):
             self.inspector.setFrameTopLeftPoint_(NSMakePoint(frame.origin.x + frame.size.width - 320,
                                                              frame.origin.y + frame.size.height - 90))
             self.inspector.orderFront_(None)
+            self.inspector.makeFirstResponder_(None)  # don't open with the slug selected
+        if sender is not None:
+            self.defaults.setBool_forKey_(self.inspector.isVisible(), "inspectorShown")
 
     def chooseFeature_(self, sender):
         paths = self.pickImage(False)
         if paths:
+            self.setFeature(import_media(paths[0]))
+
+    def setFeatureFrom_(self, found):
+        kind, payload = found
+        self.setFeature(import_media(payload[0]) if kind == "files" else import_image_data(*payload))
+
+    def setFeature(self, ref):
+        if ref:
             was_dirty = self.doc.get("dirty")
-            self.doc["feature_image"] = import_media(paths[0])
+            self.doc["feature_image"] = ref
             self.loadInspector()
             self.markDirty(was_dirty)
 
@@ -1165,13 +1754,37 @@ class AppDelegate(NSObject):
         return [u.path() for u in panel.URLs()]
 
     def insertImage_(self, sender):
-        refs = [import_media(p) for p in self.pickImage(True)]
-        if refs:
-            self.textView.insertText_(u"".join(u'\n![](%s "Caption")\n' % r for r in refs))
+        self.insertImageRefs([import_media(p) for p in self.pickImage(True)])
+
+    def insertImages_(self, found):
+        """Image files or picture data dropped or pasted into the editor."""
+        kind, payload = found
+        self.insertImageRefs([import_media(p) for p in payload] if kind == "files" else [import_image_data(*payload)])
+
+    def insertImageRefs(self, refs):
+        """Image lines at the insertion point, each a paragraph of its own. To add a caption, type
+        it in quotes after the address: ![](media:photo.jpg "At the bar")."""
+        refs = [r for r in refs if r]
+        if not refs:
+            return
+        tv = self.textView
+        text, sel = tv.string(), tv.selectedRange()
+        start, end = sel.location, sel.location + sel.length
+        before = len(text[:start]) - len(text[:start].rstrip(u"\n"))
+        after = len(text[end:]) - len(text[end:].lstrip(u"\n"))
+        lead = u"" if start == 0 else u"\n" * max(0, 2 - before)
+        trail = u"\n\n" if end >= len(text) else u"\n" * max(0, 2 - after)
+        tv.insertText_(lead + u"\n\n".join(u"![](%s)" % r for r in refs) + trail)
+        self.window.makeFirstResponder_(tv)
+        self.setStatus_(u"Added %d picture%s; %s uploads %s when you save." % (
+            len(refs), u"" if len(refs) == 1 else u"s", APP_NAME, u"it" if len(refs) == 1 else u"them"))
 
     def togglePreview_(self, sender):
         self.preview.setHidden_(not self.preview.isHidden())
+        if not self.focus:
+            self.defaults.setBool_forKey_(self.preview.isHidden(), "previewHidden")
         self.layoutEditor()
+        self.updatePreview_(None)
 
     def openInBrowser_(self, sender):
         if self.doc and self.doc.get("id"):
@@ -1195,9 +1808,12 @@ class AppDelegate(NSObject):
                 return
             self.remote, self.site_tags = result
             self.rebuildSidebar()
+            if self.doc and self.doc.get("id"):
+                self.loadPublishDate()
             if self.doc and self.doc.get("id") and not self.doc.get("dirty"):
                 summary = self.remoteSummary(self.doc["id"])
-                if summary and summary["updated_at"] != self.doc.get("base_updated_at"):
+                if summary and (summary["updated_at"] != self.doc.get("base_updated_at") or
+                                self.doc.get("converter") != html2md.VERSION):
                     self.pull(self.doc["id"])
 
         cocoa.in_background(work, done)
@@ -1221,15 +1837,36 @@ class AppDelegate(NSObject):
         self.push(None, False, False)
 
     def publishOrUnpublish_(self, sender):
-        title = self.doc.get("title") or u"Untitled"
-        if self.doc.get("status") in ("published", "scheduled"):
+        d = self.doc
+        title = d.get("title") or u"Untitled"
+        if d.get("status") == "published":
             if self.confirm(u"Unpublish “%s”?" % title,
                             u"It becomes a draft again and disappears from %s." % self.siteName(), u"Unpublish"):
                 self.push("draft", False, True)
+        elif d.get("status") == "scheduled":
+            if self.confirm(u"Unschedule “%s”?" % title,
+                            u"It becomes a draft again and won’t go live on %s." % long_date(d.get("published_at")),
+                            u"Unschedule"):
+                self.push("draft", False, True)
+        elif d.get("publish_later"):
+            if not self.scheduleIsAhead():
+                return
+            if self.confirm(u"Schedule “%s”?" % title,
+                            u"%s publishes it on %s. It won’t be emailed to subscribers."
+                            % (self.siteName(), long_date(d.get("published_at"))), u"Schedule"):
+                self.push("scheduled", False, True)
         elif self.confirm(u"Publish “%s”?" % title,
                           u"It goes live on %s right away. It won’t be emailed to subscribers." % self.siteName(),
                           u"Publish"):
             self.push("published", False, True)
+
+    def scheduleIsAhead(self):
+        if (iso_seconds(self.doc.get("published_at")) or 0) < time.time() + SCHEDULE_LEAD - 30:
+            if not self.inspector.isVisible():
+                self.toggleInspector_(None)
+            self.setStatus_(u"Pick a time at least five minutes from now under Publish Date in the Inspector.")
+            return False
+        return True
 
     def revertToRemote_(self, sender):
         if self.doc.get("dirty") and not self.confirm(
@@ -1251,6 +1888,9 @@ class AppDelegate(NSObject):
         if doc.get("status") == "published" and not confirmed and not self.confirm(
                 u"Update the live post?", u"“%s” is published. Updating changes what readers see on %s now."
                 % (doc.get("title") or u"Untitled", self.siteName()), u"Update"):
+            return
+        if (status == "scheduled" or (status is None and doc.get("status") == "scheduled")) and \
+                not self.scheduleIsAhead():
             return
         if len(doc.get("excerpt") or u"") > EXCERPT_MAX:
             self.setStatus_(u"The excerpt is longer than %d characters; shorten it in the Inspector." % EXCERPT_MAX)
@@ -1281,6 +1921,9 @@ class AppDelegate(NSObject):
             fields["feature_image"] = upload(feature, uploads) if feature and media_path(feature) else feature
             if status:
                 fields["status"] = status
+            if snapshot.get("published_at") and (status == "scheduled" or (
+                    status is None and snapshot.get("status") in ("scheduled", "published"))):
+                fields["published_at"] = snapshot["published_at"]
             if not snapshot.get("id"):
                 fields.setdefault("status", "draft")
                 return g.create_post(fields), uploads
@@ -1310,7 +1953,11 @@ class AppDelegate(NSObject):
             old_key = doc["key"]
             doc.update({"id": post["id"], "key": post["id"], "status": post["status"], "url": post.get("url"),
                         "slug": post.get("slug") or u"", "base_updated_at": post["updated_at"], "uploads": uploads,
-                        "saved_at": time.strftime("%H:%M")})
+                        "saved_at": time.strftime("%H:%M"), "converter": html2md.VERSION})
+            if post["status"] in ("scheduled", "published") or post.get("published_at"):
+                doc["published_at"] = post.get("published_at")
+            if post["status"] == "published":
+                doc["publish_later"] = False
             doc["dirty"] = any(doc.get(k) != snapshot.get(k)
                                for k in ("markdown", "title", "excerpt", "tags", "feature_image"))
             save_doc(doc)
@@ -1319,7 +1966,8 @@ class AppDelegate(NSObject):
             self.defaults.setObject_forKey_(doc["key"], "lastKey")
             self.loadInspector()
             self.updateState()
-            self.setStatus_({"published": u"Published ✓", "draft": u"Saved as a draft ✓"}
+            self.setStatus_({"published": u"Published ✓", "draft": u"Saved as a draft ✓",
+                             "scheduled": u"Scheduled for %s ✓" % long_date(post.get("published_at"))}
                             .get(post["status"], u"Saved ✓"))
             self.refresh_(None)
 

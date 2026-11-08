@@ -61,18 +61,34 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** todo · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** in progress (parked 2026-11-08) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
-0.3 addressed: post states, local draft delete, push as draft, slug/excerpt/tags inspector, WebP,
-sorting, polish. First, **get the user's feedback on 0.3** and fix what they report. Then:
-- Lion full screen (`NSWindowCollectionBehaviorFullScreenPrimary`) with a distraction-free layout.
-- Find bar (`textView.setUsesFindBar_(True)`, Lion's `NSTextFinder`).
-- Drag & drop and paste images into the editor (import into media, insert Markdown).
-- Schedule a post (date picker in the inspector → `status: scheduled`, `published_at`).
-- Feature-image focal preview in the inspector; post URL preview with a copy button.
-- Round-trip safety: test `html2md` → `markdown.to_html` on every post on the site; anything lossy
-  stays inside an HTML card instead of being rewritten.
-- Remember window/split positions; restore the last selected post and scroll position.
+Done on the branch (deployed to the Mac as 0.4, screenshot-checked unless noted):
+- Long titles wrap and the header grows; Return or Tab in the title moves into the text. The post's
+  path in the status line truncates in the middle instead of being clipped.
+- Converter version stored in each pulled post (`html2md.VERSION`); older clean copies re-pull.
+- Find bar (`setUsesFindBar_`) with Edit ▸ Find and Spelling and Grammar menus. *Find bar itself not
+  screenshotted yet.*
+- Lion full screen (View ▸ Enter Full Screen, ⌃⌘F): hides the post list, preview and inspector; the
+  toolbar auto-hides. *Not tried on the Mac: entering full screen would switch the user's Space.*
+- View ▸ Hide Post List (⌥⌘S). Sidebar width, preview split, preview/post list/inspector visibility,
+  and each post's scroll position and selection are remembered.
+- Drag and drop or paste images (files or picture data) into the editor → `media:` image lines,
+  uploaded on save. Paste was tested through a private pasteboard; real drags need the user.
+- Inspector: post address with a Copy button, Publish Date (schedule a draft, move a scheduled or
+  published post), feature image cropped like a post card that also takes drops, HUD-style buttons.
+  Publish… becomes Schedule…/Unschedule…; the site gets `status: scheduled` + `published_at`.
+  *Scheduling hasn't been run against the real site; ask before testing it there.*
+- Code and HTML-card shading has no gaps between lines; dates show in the Mac's time zone.
+- Hidden `DebugActions` default (see `runDebugActions_`) for screenshotting states over SSH.
+
+Next:
+- Ask the user to try full screen, a real drag from Finder, a pasted screenshot, the find bar, and
+  (with their go-ahead, on a throwaway draft) Schedule… → Unschedule….
+- Round-trip safety: compare `html2md` → `markdown.to_html` on every post (read-only, from inside the
+  app because the key needs the GUI keychain), and keep lossy blocks inside an HTML card. Watch image
+  cards with `kg-width-wide/full`, width/height and srcset.
+- Address preview for posts without a slug; maybe fold HTML cards into a compact token in the editor.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 

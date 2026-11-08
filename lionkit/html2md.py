@@ -9,6 +9,10 @@ import re
 from htmlentitydefs import name2codepoint
 from HTMLParser import HTMLParser
 
+# Bump whenever the same HTML would convert to different Markdown: Planchette re-pulls posts it
+# converted with an older version (unless they have unsaved edits).
+VERSION = 2
+
 VOID = {"img", "br", "hr", "meta", "input", "source", "link", "col", "area", "wbr", "embed", "param"}
 HTML_CARD = re.compile(r"(<!--kg-card-begin: html-->.*?<!--kg-card-end: html-->)", re.S)
 
