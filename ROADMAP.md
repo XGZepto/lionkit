@@ -85,6 +85,13 @@ In the library, albums are cassette cases with printed J-cards standing on walnu
 and Liked Songs are hand-labelled mixtapes. Views crossfade in 0.2 s between two snapshots, which keeps
 the Core 2 Duo smooth. I checked all of this with sample data and with the user's library of 143 albums.
 
+**Polish pass:** The reels are now Core Animation layers, so a playing song costs 6 to 10 percent of a CPU
+core instead of about 50. Opening an album from the shelf, an artist page or search flips the pane over in
+3D like a Dashboard widget, and going back flips it the other way. The app icon is now the cassette, the mini
+player uses the Walkman materials, and the chrome nameplate reads better. A real-data run caught "Invalid
+limit" on artist pages: Spotify now allows at most 10 albums per request there. Hidden test settings:
+`DebugAnimationScale` slows the flip, and `DebugSnapshot` makes Kassett draw its windows into PNGs.
+
 **Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
 the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
 cassette app icon in `icon.py` yet. I also couldn't test the not-allowlisted sheet with a real refused

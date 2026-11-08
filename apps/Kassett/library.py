@@ -1499,8 +1499,14 @@ class Library(NSObject):
         def work():
             a = client.artist(artist_id) or {}
             info = slim_artist(a)
-            songs = [slim_track(t) for t in client.artist_songs(a)] if a.get("name") else []
-            albums = [slim_album(x) for x in (client.artist_albums(artist_id) or {}).get("items") or [] if x]
+            try:   # the page still opens if one of its parts fails
+                songs = [slim_track(t) for t in client.artist_songs(a)] if a.get("name") else []
+            except spotify.SpotifyError:
+                songs = []
+            try:
+                albums = [slim_album(x) for x in (client.artist_albums(artist_id) or {}).get("items") or [] if x]
+            except spotify.SpotifyError:
+                albums = []
             try:
                 following = bool((client.library_contains([info["uri"]]) or [False])[0])
             except spotify.SpotifyError:

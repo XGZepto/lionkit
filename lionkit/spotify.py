@@ -37,7 +37,7 @@ SCOPES = " ".join([
 ])
 KEYCHAIN_SERVICE = "LionKit Spotify"
 PAGE = 50            # most library endpoints return at most 50 items per request
-SEARCH_LIMIT = 10    # the most /search returns per type since February 2026
+SEARCH_LIMIT = 10    # the most /search (and an artist's albums) return per request since February 2026
 
 # Spotify's machine-readable player errors, in words a person can act on.
 REASONS = {
@@ -331,7 +331,7 @@ class Spotify(object):
 
     def artist_albums(self, artist_id, offset=0):
         return self.call("GET", "/artists/%s/albums" % artist_id,
-                         params={"include_groups": "album,single", "limit": 20, "offset": offset,
+                         params={"include_groups": "album,single", "limit": SEARCH_LIMIT, "offset": offset,
                                  "market": "from_token"})
 
     def artist_songs(self, artist):
