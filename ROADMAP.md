@@ -17,7 +17,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 | `lionkit` library: http, keychain, ghost, spotify, markdown, html2md, cocoa, icons | — | works |
 | Planchette (Ghost blog editor) | 0.3 | in user testing |
 | Kassett (Spotify Connect remote) | 0.2 | in user testing; cassette redesign mocked up |
-| WiFiFix (WPA2/WPA3 transition networks) | 0.1 | menu bar app built (demo-verified), not yet tried on a real network |
+| Latchkey (WPA2/WPA3 transition networks) | 0.1 | menu bar app built (demo-verified), not yet tried on a real network |
 | Dev tooling: deploy, launch (GUI session), shot, build_lionkit | — | works |
 
 ## Milestones
@@ -27,7 +27,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 2. **Public beta**: anyone with a Lion Mac can download, open and update the apps from the
    website. (WS-5, WS-6)
 3. **Social**: a Mastodon + Bluesky client in the spirit of Tweetie. (WS-4)
-4. **Little joys**: Dashboard widgets, Wi-Fi fix for everyone, more apps from the backlog. (WS-3, WS-7)
+4. **Little joys**: Dashboard widgets, Latchkey for everyone, more apps from the backlog. (WS-3, WS-7)
 
 ## Current milestone: public beta 0.5
 
@@ -235,15 +235,15 @@ Remaining:
   create the GitHub repo, push, or publish a release without their explicit go-ahead.**
 
 ## WS-7 · System fixes
-**Status:** review (WiFiFix 0.1 built, not yet tried on a real network) · **Branch:** `ws/system` · **Owns:** `system/`
+**Status:** review (Latchkey 0.1 built, not yet tried on a real network) · **Branch:** `ws/system` · **Owns:** `system/`
 
-- **WiFiFix for everyone**: Lion labels WPA2/WPA3 transition networks "WPA2 Enterprise" and won't
-  join them. WiFiFix is a small app with a menu-bar status item: pick the network, enter the
+- **Latchkey for everyone**: Lion labels WPA2/WPA3 transition networks "WPA2 Enterprise" and won't
+  join them. Latchkey is a small app with a menu-bar status item: pick the network, enter the
   password once (kept in the keychain), see join status. Must run in the GUI session.
 - A "Lion in 2026" setup guide on the site: Momiji, uBlock Origin, h264ify, which Apple
-  services to switch off, Wi-Fi fix, LionKit apps.
+  services to switch off, and the LionKit apps.
 
-Done (0.1, see `system/WiFiFix/README.md`): the menu bar app with a key-shaped status glyph
+Done (0.1, see `system/Latchkey/README.md`): the menu bar app with a key-shaped status glyph
 (signal, joining animation, off), a Lion-style network menu, a join dialog modelled on Lion's
 own, rejoin with back-off, passwords in the login keychain, Open at Login, Forget and "Rejoin Now".
 A brass-key app icon. Demo mode with made-up networks
@@ -259,7 +259,6 @@ Next:
   needs to click it once (check row highlight, the scan on open, and how the menu resizes).
 - Joining for real is untested: the real scan and the join run only when the user acts.
 - "Open at Login" is untested (it adds a real login item). Reading the list works.
-- The site's Wi-Fi Fix card still shows the old glass-disc icon (WS-6).
 
 ---
 

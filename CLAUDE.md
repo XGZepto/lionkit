@@ -87,7 +87,7 @@ Networking and media:
 lionkit/          shared library (copied into every app bundle at build time)
 apps/<App>/       main.py + app.json {name, id, version} + icon.py (draws the icon with AppKit)
 widgets/          Dashboard widgets (.wdgt folders)
-system/           system-level fixes (WiFiFix)
+system/           system-level fixes (Latchkey)
 design/           HTML mockups: the visual spec for upcoming UI work
 site/             the public website (GitHub Pages, static HTML)
 docs/             design guide, distribution plan, notes

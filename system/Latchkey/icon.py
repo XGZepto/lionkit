@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""WiFiFix icon: a brass key whose bow is the Wi-Fi fan, cut through the metal, lying at an angle.
+"""Latchkey icon: a brass key whose bow is the Wi-Fi fan, cut through the metal, lying at an angle.
 
 The key's outline is drawn once as a white silhouette (fills and round-jointed strokes give the
 rounded bow, cleared shapes cut the slots and the bitting); the brass face, its thickness, the
