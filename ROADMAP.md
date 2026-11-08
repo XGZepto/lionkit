@@ -102,6 +102,15 @@ picked songs show at once; and Python switches threads every 10 bytecodes. Scrol
 to about 1 ms (90% under 25 ms), and the recurring 120–170 ms freezes are mostly gone. Launch still spends
 about 0.8 s reading the login from the keychain.
 
+**Latest round:** Albums play as tapes with real sides. Multi-disc albums get a side per disc,
+single-disc albums are split into two equal-length sides, the label shows the side and the tape length,
+the tape packs follow the whole side, and side A to B turns the cassette over. The album track list is
+grouped by side. The playing song's title, artists and album link into the library, on the LCDs, the mini
+player, a right-click menu and Controls > Show Current Song in Library (⌥⌘L). Optimistic changes no longer
+jump back while Spotify catches up. Clicking the library's LCD brings the player to the front. Scrolling
+past an artist page or the shelf shows the photo or the wall. The site screenshots in `site/img/shots/` come
+from the user's real library at the user's request. Merged into master on 2026-11-08.
+
 **Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
 the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
 cassette app icon in `icon.py` yet. I also couldn't test the not-allowlisted sheet with a real refused
