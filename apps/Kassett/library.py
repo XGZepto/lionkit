@@ -4,12 +4,15 @@ track lists, album and artist grids, the artist page and search, drawn after des
 
 Lists load 50 rows at a time as you scroll, and only small fields are kept from each item."""
 import HTMLParser
+import math
 import random
 import re
 import time
 
 from AppKit import *  # noqa: F401,F403
 from Foundation import *  # noqa: F401,F403
+from Quartz import (CABasicAnimation, CALayer, CAMediaTimingFunction, CATransaction,
+                    CATransform3DMakeRotation, CATransformLayer, kCAMediaTimingFunctionEaseInEaseOut)
 
 from lionkit import cocoa, spotify
 import art
@@ -785,6 +788,9 @@ class Library(NSObject):
         self.fade.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
         self.fade.setHidden_(True)
         pages.addSubview_(self.fade)
+        self.flip = FlipView.alloc().initWithFrame_(pages.bounds())
+        self.flip.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
+        pages.addSubview_(self.flip)
 
         split.addSubview_(side)
         split.addSubview_(pages)
@@ -1053,7 +1059,15 @@ class Library(NSObject):
     def location(self):
         return self.history[self.index] if 0 <= self.index < len(self.history) else None
 
-    def go(self, loc, push=True):
+    def go(self, loc, push=True, came_from=None):
+        came_from = came_from or self.location()
+        tapes = ("albums", "artist", "search")
+        if loc and loc[0] == "album" and came_from and came_from[0] in tapes:
+            self.transition = "flip"            # turn the tape over to read its track list
+        elif came_from and came_from[0] == "album" and loc and loc[0] in tapes:
+            self.transition = "flipback"
+        else:
+            self.transition = "fade"
         if push and loc != self.location():
             del self.history[self.index + 1:]
             self.history.append(loc)
@@ -1064,13 +1078,15 @@ class Library(NSObject):
 
     def goBack(self):
         if self.index > 0:
+            came_from = self.location()
             self.index -= 1
-            self.go(self.history[self.index], False)
+            self.go(self.history[self.index], False, came_from)
 
     def goForward(self):
         if self.index < len(self.history) - 1:
+            came_from = self.location()
             self.index += 1
-            self.go(self.history[self.index], False)
+            self.go(self.history[self.index], False, came_from)
 
     def updateNav(self):
         if hasattr(self, "navControl"):
@@ -1078,19 +1094,22 @@ class Library(NSObject):
             self.navControl.setEnabled_forSegment_(self.index < len(self.history) - 1, 1)
 
     def showPage(self, page):
-        """Switch views with a short crossfade. It fades between two snapshots on an opaque view, so
-        nothing underneath redraws during the fade (the Core 2 Duo stays smooth)."""
+        """Switch views with a short crossfade, or flip the pane over when opening a tape. Both work
+        on snapshots, so nothing underneath redraws while they run (the Core 2 Duo stays smooth)."""
         pages = (self.gridPage, self.list.view, self.canvasPage, self.message)
         old = [p for p in pages if not p.isHidden()]
-        fading = old and old[0] is not page and self.window.isVisible()
-        if fading:
-            self.fade.start(snapshot(old[0]))
+        moving = old and old[0] is not page and self.window.isVisible()
+        transition, self.transition = getattr(self, "transition", "fade"), "fade"
+        effect = self.flip if transition in ("flip", "flipback") else self.fade
+        if moving:
+            effect.direction = -1 if transition == "flipback" else 1
+            effect.start(snapshot(old[0]))
         for p in pages:
             p.setHidden_(p is not page)
         self.followButton.setHidden_(True)
-        if fading:
-            self.fade.target = page
-            self.fade.performSelector_withObject_afterDelay_("begin:", None, 0)
+        if moving:
+            effect.target = page
+            effect.performSelector_withObject_afterDelay_("begin:", None, 0)
 
     def showMessage(self, title, text, login=False):
         self.message.title, self.message.text = title, text
@@ -1721,6 +1740,106 @@ class FadeView(NSView):
         if self.new is not None:
             self.new.drawInRect_fromRect_operation_fraction_(self.bounds(), NSZeroRect, NSCompositeSourceOver,
                                                              self.t * self.t * (3 - 2 * self.t))
+
+
+_linen = {}
+
+
+def linen(size):
+    """Lion's dark linen, which shows behind the pane while it turns over."""
+    if "tile" not in _linen:
+        tile = NSImage.alloc().initWithSize_(NSMakeSize(96, 96))
+        tile.lockFocus()
+        paint.fill(NSMakeRect(0, 0, 96, 96), "#2e3034")
+        rnd = random.Random(5)
+        for i in range(96):
+            paint.fill(NSMakeRect(0, i, 96, 1), white(1, rnd.uniform(0, 0.035)) if i % 2 else white(0, rnd.uniform(0.02, 0.08)))
+            paint.fill(NSMakeRect(i, 0, 1, 96), white(1, rnd.uniform(0, 0.03)) if i % 2 else white(0, rnd.uniform(0.02, 0.07)))
+        tile.unlockFocus()
+        _linen["tile"] = NSColor.colorWithPatternImage_(tile)
+    img = NSImage.alloc().initWithSize_(size)
+    img.lockFocus()
+    _linen["tile"].set()
+    NSBezierPath.fillRect_(NSMakeRect(0, 0, size.width, size.height))
+    NSGradient.alloc().initWithStartingColor_endingColor_(white(0, 0), white(0, 0.45)).drawInRect_relativeCenterPosition_(
+        NSMakeRect(0, 0, size.width, size.height), NSMakePoint(0, 0))
+    img.unlockFocus()
+    return img
+
+
+class FlipView(NSView):
+    """Turns the pane over like a Dashboard widget: the old view on the front of a card, the new one
+    on its back, rotated by Core Animation on the GPU over Lion's linen."""
+    DURATION = 0.6
+
+    def initWithFrame_(self, frame):
+        self = super(FlipView, self).initWithFrame_(frame)
+        if self:
+            self.setLayer_(CALayer.layer())
+            self.setWantsLayer_(True)
+            self.setHidden_(True)
+            self.old, self.target, self.direction, self.card = None, None, 1, None
+        return self
+
+    def hitTest_(self, point):
+        return None if self.isHidden() else self      # no clicks reach the views while it turns
+
+    def start(self, old):
+        b = self.bounds()
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        root = self.layer()
+        root.setSublayers_([])
+        root.setContents_(linen(b.size))      # on the root, so the turning card can't dip behind it
+        perspective = CATransform3DMakeRotation(0, 0, 1, 0)
+        perspective.m34 = -1.0 / 1600
+        root.setSublayerTransform_(perspective)
+        card = CATransformLayer.layer()
+        card.setFrame_(((0, 0), (b.size.width, b.size.height)))
+        front = CALayer.layer()
+        front.setFrame_(((0, 0), (b.size.width, b.size.height)))
+        front.setContents_(old)
+        front.setDoubleSided_(False)
+        card.addSublayer_(front)
+        root.addSublayer_(card)
+        CATransaction.commit()
+        self.card = card
+        self.setHidden_(False)
+
+    def begin_(self, _):
+        if self.target is None or self.card is None:
+            return self.finish_(None)
+        b = self.bounds()
+        # `defaults write page.zepto.kassett DebugAnimationScale 10` slows the flip down to check it.
+        self.DURATION = 0.6 * (NSUserDefaults.standardUserDefaults().floatForKey_("DebugAnimationScale") or 1)
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        back = CALayer.layer()
+        back.setFrame_(((0, 0), (b.size.width, b.size.height)))
+        back.setContents_(snapshot(self.target))
+        back.setDoubleSided_(False)
+        back.setTransform_(CATransform3DMakeRotation(math.pi, 0, 1, 0))
+        self.card.addSublayer_(back)
+        angle = math.pi * self.direction
+        CATransaction.commit()
+        ease = CAMediaTimingFunction.functionWithName_(kCAMediaTimingFunctionEaseInEaseOut)
+        turn = CABasicAnimation.animationWithKeyPath_("transform.rotation.y")
+        turn.setFromValue_(0.0)
+        turn.setToValue_(angle)
+        turn.setDuration_(self.DURATION)
+        turn.setTimingFunction_(ease)
+        # The card's own transform stays as it is (a half turn as the model value decomposes ambiguously
+        # and would play backwards); the animation holds its end until the card is thrown away.
+        turn.setRemovedOnCompletion_(False)
+        turn.setFillMode_("forwards")
+        self.card.addAnimation_forKey_(turn, "turn")
+        self.performSelector_withObject_afterDelay_("finish:", None, self.DURATION + 0.02)
+
+    def finish_(self, _):
+        self.setHidden_(True)
+        self.layer().setSublayers_([])
+        self.layer().setContents_(None)
+        self.card = self.target = None
 
 
 class GridBar(LibraryFlipped):

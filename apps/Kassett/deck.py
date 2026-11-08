@@ -10,6 +10,7 @@ import time
 
 from AppKit import *  # noqa: F401,F403
 from Foundation import *  # noqa: F401,F403
+from Quartz import CABasicAnimation, CACurrentMediaTime, CALayer
 
 import art
 import glyphs
@@ -197,7 +198,11 @@ class CassetteView(FlippedView):
             self.p = 0.0
             self.angles = [0.0, 37.0]
             self.engage, self.engaged = 0.0, False     # how far the head and pinch roller have moved in
-            self.bg, self.bg_key, self.overlay = None, None, None
+            self.bg, self.bg_key = None, None
+            self.coarse = False                        # redraw the packs less often while winding fast
+            self.reels = ReelView.alloc().initWithFrame_(self.bounds())
+            self.addSubview_(self.reels)
+            self.reels.setUp(self.hubs(), flipped_image(452, 286, self.drawGlass))
         return self
 
     def mouseDownCanMoveWindow(self):
@@ -219,16 +224,14 @@ class CassetteView(FlippedView):
 
     def key(self):
         left, right = pack_radii(self.p)
-        return (self.title, self.subtitle, self.shell, int(left * 2), int(right * 2))
+        step = 6.0 if self.coarse else 1.0
+        return (self.title, self.subtitle, self.shell, int(left * 2 / step), int(right * 2 / step))
 
-    def advance(self, dt, speed):
-        """Move the tape for dt seconds at `speed` times play speed (negative rewinds)."""
+    def spin(self, speed):
+        """Turn the reels at `speed` times play speed (0 stops them, negative rewinds): the tape
+        moves at 4.76 cm/s, so each reel turns at that speed divided by its pack's radius."""
         left, right = pack_radii(self.p)
-        travel = TAPE_SPEED * speed * dt
-        self.angles[0] = (self.angles[0] + math.degrees(travel / left)) % 360
-        self.angles[1] = (self.angles[1] + math.degrees(travel / right)) % 360
-        for cx, cy in self.hubs():
-            self.setNeedsDisplayInRect_(NSMakeRect(cx - HUB - 4, cy - HUB - 4, 2 * HUB + 8, 2 * HUB + 10))
+        self.reels.setSpeeds([TAPE_SPEED * speed / left, TAPE_SPEED * speed / right])
 
     def setEngaged(self, engaged):
         self.engaged = engaged
@@ -249,16 +252,10 @@ class CassetteView(FlippedView):
         if self.bg is None or self.key() != self.bg_key:
             self.bg_key = self.key()
             self.bg = flipped_image(452, 286, self.drawBody)
-        if self.overlay is None:
-            self.overlay = flipped_image(452, 286, self.drawGlass)
         draw_part(self.bg, rect)
         sx, sy = self.SHELL
         if NSIntersectsRect(rect, NSMakeRect(sx + 160, sy + 205, 140, 50)):
             draw_mechanism(sx, sy, ease(self.engage), self.shell == "clear")
-        for (cx, cy), angle in zip(self.hubs(), self.angles):
-            if NSIntersectsRect(rect, NSMakeRect(cx - HUB - 4, cy - HUB - 4, 2 * HUB + 8, 2 * HUB + 10)):
-                draw_hub(cx, cy, angle)
-        draw_part(self.overlay, rect)
 
     def drawBody(self):
         paint.fill(paint.rounded(NSOffsetRect(self.WELL, 0, 1), 10), white(1, 0.85))
@@ -269,6 +266,8 @@ class CassetteView(FlippedView):
         paint.inner_shadow(bay, 3, 10, white(0, 0.9))
         sx, sy = self.SHELL
         draw_cassette(sx, sy, self.shell, self.title, self.subtitle, self.p)
+        for cx, cy in self.hubs():          # the hubs' shadows on the tape; the hubs are layers on top
+            paint.with_shadow(paint.shadow(1, 3, white(0, 0.6)), lambda: paint.fill(paint.oval(cx, cy, HUB - 1), "#3a2a1e"))
 
     def drawGlass(self):
         """The window in the label, the smoked door in front, and a pull notch at the top."""
@@ -508,7 +507,7 @@ def draw_pack(cx, cy, r):
 
 def draw_hub(cx, cy, angle):
     """A white hub with its tape clamp and six teeth, and the player's three-spline spindle in it,
-    turned counterclockwise by `angle` degrees (both turn together)."""
+    turned counterclockwise by `angle` degrees (both turn together). Unlit: hub_light() lights it."""
     r = HUB
     NSGraphicsContext.saveGraphicsState()
     t = NSAffineTransform.transform()
@@ -516,9 +515,7 @@ def draw_hub(cx, cy, angle):
     t.rotateByDegrees_(-angle)
     t.concat()
     ring = paint.oval(0, 0, r)
-    paint.with_shadow(paint.shadow(1, 2, white(0, 0.5)), lambda: paint.fill(ring, "#f3efe6"))
-    NSGradient.alloc().initWithStartingColor_endingColor_(hexc("#fdfbf6"), hexc("#d9d1c0")).drawInBezierPath_relativeCenterPosition_(
-        ring, NSMakePoint(-0.3, -0.4))
+    paint.fill(ring, "#eee8da")
     paint.stroke(paint.oval(0, 0, r - 0.5), "#a99f8b", 1)
     paint.stroke(paint.oval(0, 0, r - 4.5), white(1, 0.7), 1)
     paint.stroke(paint.oval(0, 0, r - 5.5), white(0, 0.08), 1)
@@ -555,6 +552,86 @@ def draw_hub(cx, cy, angle):
     paint.fill(paint.oval(0, 0, 3), "#6a6a6a")
     paint.fill(paint.oval(-0.8, -0.8, 1.1), white(1, 0.6))
     NSGraphicsContext.restoreGraphicsState()
+
+
+HUB_BOX = int(2 * HUB + 4)
+
+
+def hub_image():
+    c = HUB_BOX / 2.0
+    return flipped_image(HUB_BOX, HUB_BOX, lambda: draw_hub(c, c, 0))
+
+
+def hub_light():
+    """Light from above on the hub, which stays put while the hub turns under it."""
+    def body():
+        c = HUB_BOX / 2.0
+        ring = paint.oval(c, c, HUB)
+        NSGradient.alloc().initWithStartingColor_endingColor_(white(1, 0.55), white(1, 0)).drawInBezierPath_relativeCenterPosition_(
+            ring, NSMakePoint(-0.35, -0.45))
+        paint.clipped(ring, lambda: paint.fill(NSMakeRect(0, c, HUB_BOX, c), white(0, 0), white(0, 0.14)))
+    return flipped_image(HUB_BOX, HUB_BOX, body)
+
+
+class ReelView(NSView):
+    """The two hubs as Core Animation layers. The GPU turns them; Python only sets each one's speed
+    when it changes (play, pause, a seek, or a pack growing a little), so playing costs no CPU."""
+
+    def initWithFrame_(self, frame):
+        self = super(ReelView, self).initWithFrame_(frame)
+        if self:
+            root = CALayer.layer()
+            root.setGeometryFlipped_(True)
+            self.setLayer_(root)
+            self.setWantsLayer_(True)
+            self.hubs, self.speeds = [], []
+            self.glass = None
+        return self
+
+    def hitTest_(self, point):
+        return None          # clicks and window drags go to the cassette underneath
+
+    def setUp(self, centers, glass):
+        root = self.layer()
+        image, light = hub_image(), hub_light()
+        for cx, cy in centers:
+            hub = CALayer.layer()
+            hub.setBounds_(((0, 0), (HUB_BOX, HUB_BOX)))
+            hub.setPosition_((cx, cy))
+            hub.setContents_(image)
+            spin = CABasicAnimation.animationWithKeyPath_("transform.rotation.z")
+            spin.setFromValue_(0.0)
+            spin.setToValue_(-2 * math.pi)       # counterclockwise on screen, like tape going left to right
+            spin.setDuration_(1.0)
+            spin.setRepeatCount_(1e9)
+            hub.addAnimation_forKey_(spin, "spin")
+            hub.setSpeed_(0.0)
+            hub.setTimeOffset_(1e5 + len(self.hubs) * 0.37)   # room to run backwards when rewinding
+            root.addSublayer_(hub)
+            lit = CALayer.layer()
+            lit.setBounds_(((0, 0), (HUB_BOX, HUB_BOX)))
+            lit.setPosition_((cx, cy))
+            lit.setContents_(light)
+            root.addSublayer_(lit)
+            self.hubs.append(hub)
+            self.speeds.append(0.0)
+        self.glass = CALayer.layer()
+        self.glass.setFrame_(((0, 0), (self.bounds().size.width, self.bounds().size.height)))
+        self.glass.setContents_(glass)
+        root.addSublayer_(self.glass)
+
+    def setSpeeds(self, radians_per_second):
+        """Change each hub's speed without a jump in where it is."""
+        now = CACurrentMediaTime()
+        for i, (hub, w) in enumerate(zip(self.hubs, radians_per_second)):
+            turns = w / (2 * math.pi)
+            if abs(turns - self.speeds[i]) < 0.002:
+                continue
+            local = hub.convertTime_fromLayer_(now, None)
+            hub.setTimeOffset_(local)
+            hub.setBeginTime_(now)
+            hub.setSpeed_(turns)
+            self.speeds[i] = turns
 
 
 # ---- piano keys --------------------------------------------------------------------------------------
@@ -941,6 +1018,8 @@ class Deck(NSObject):
         """controllable is False when Spotify won't take commands for the device that's playing."""
         self.playing, self.controllable = playing, controllable
         self.cassette.setEngaged(playing)
+        if self.whirr is None:
+            self.cassette.spin(1.0 if playing else 0.0)
         cell = self.playKey.cell()
         cell.glyph, cell.accent = ("pause" if playing else "play"), playing
         self.playKey.setToolTip_(u"Pause" if playing else u"Play")
@@ -955,8 +1034,11 @@ class Deck(NSObject):
         p = float(progress_ms) / duration_ms if duration_ms else 0.0
         if jumped and abs(p - self.cassette.p) > 0.01 and self.window.isVisible():
             self.whirr = (self.cassette.p, p, time.time())
+            self.cassette.coarse = True
+            self.cassette.spin(WHIRR_SPEED if p > self.cassette.p else -WHIRR_SPEED)
         elif self.whirr is None:
             self.cassette.setProgress(p)
+            self.cassette.spin(1.0 if self.playing else 0.0)
         self.p_target = p
         lcd = self.lcd
         if not lcd.dragging:
@@ -974,7 +1056,7 @@ class Deck(NSObject):
     # ---- animation ----------------------------------------------------------------------------------
     def animating(self):
         return self.window.isVisible() and not self.window.isMiniaturized() and \
-            (self.playing or self.whirr is not None or self.cassette.mechanismMoving())
+            (self.whirr is not None or self.cassette.mechanismMoving())
 
     def ensureTimer(self):
         if self.animating() and self.timer is None:
@@ -990,12 +1072,11 @@ class Deck(NSObject):
             t = (now - start) / WHIRR
             if t >= 1:
                 self.whirr = None
+                self.cassette.coarse = False
                 self.cassette.setProgress(self.p_target)
+                self.cassette.spin(1.0 if self.playing else 0.0)
             else:
                 self.cassette.setProgress(start_p + (end_p - start_p) * ease(t))
-                self.cassette.advance(dt, WHIRR_SPEED if end_p > start_p else -WHIRR_SPEED)
-        elif self.playing:
-            self.cassette.advance(dt, 1.0)
         self.cassette.stepMechanism(dt)
         if not self.animating():
             self.timer.invalidate()
@@ -1164,7 +1245,7 @@ class Mini(NSObject):
             b.setEnabled_(has_track and controllable)
         self.playButton.setEnabled_(controllable)
         if playing and self.timer is None and self.window.isVisible():
-            self.timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(1 / FPS, self, "frame:", None, True)
+            self.timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(1 / 12.0, self, "frame:", None, True)
             NSRunLoop.currentRunLoop().addTimer_forMode_(self.timer, NSRunLoopCommonModes)
 
     def frame_(self, timer):
@@ -1172,7 +1253,7 @@ class Mini(NSObject):
             self.timer.invalidate()
             self.timer = None
             return
-        self.view.angle = (self.view.angle + 360 / FPS / 1.6) % 360
+        self.view.angle = (self.view.angle + 360 / 12.0 / 1.6) % 360
         self.view.setNeedsDisplayInRect_(NSMakeRect(12, 16, 96, 62))
 
     def windowWillClose_(self, note):
