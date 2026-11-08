@@ -836,6 +836,16 @@ class AppDelegate(NSObject):
                    ("library", getattr(self.library, "window", None)),
                    ("sheet", getattr(getattr(self, "ownApp", None), "sheet", None)),
                    ("upnext", self.upnext.view.window() if self.upnext.isShown() else None)]
+        if self.library is not None:      # how long the visible library page takes to draw, five times
+            page = [p for p in (self.library.gridPage, self.library.canvasPage, self.library.list.view) if not p.isHidden()]
+            if page:
+                times = []
+                for _ in range(5):
+                    start = time.time()
+                    snapshot = page[0].bitmapImageRepForCachingDisplayInRect_(page[0].bounds())
+                    page[0].cacheDisplayInRect_toBitmapImageRep_(page[0].bounds(), snapshot)
+                    times.append((time.time() - start) * 1000)
+                log("library page draw ms: %s" % u", ".join(u"%.0f" % t for t in times))
         for name, w in windows:
             if w is None or not w.isVisible():
                 continue

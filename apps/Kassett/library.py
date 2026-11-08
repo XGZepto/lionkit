@@ -3,8 +3,10 @@
 track lists, album and artist grids, the artist page and search, drawn after design/kassett.
 
 Lists load 50 rows at a time as you scroll, and only small fields are kept from each item."""
+import collections
 import HTMLParser
 import math
+import os
 import random
 import re
 import time
@@ -108,6 +110,24 @@ class SourceCell(NSTextFieldCell):
 
 
 # ---- a canvas of drawn, clickable items (grids, the artist page, search results) ----------------------
+PAD = 10   # room round a cached item for its shadow
+
+
+def have_art(url):
+    """Whether a picture is already on disk (a cheap check, so a cached tape can be redrawn once it is)."""
+    return bool(url) and os.path.exists(art.path_for(url))
+
+
+def case_key(e):
+    a, r = e["data"], e["rect"]
+    return ("case", a.get("id"), a.get("image"), int(r.size.width), int(r.size.height), have_art(a.get("image")))
+
+
+def circle_key(e):
+    a, r = e["data"], e["rect"]
+    return ("circle", a.get("id"), int(r.size.width), int(r.size.height), have_art(a.get("image")))
+
+
 class CanvasView(LibraryFlipped):
     """Asks `builder(width)` for (items, height). Each item is a dict with a `rect`, a `draw(item,
     selected)` function and optional `click`, `double` and `menu` callbacks."""
@@ -117,10 +137,14 @@ class CanvasView(LibraryFlipped):
         if self:
             self.builder, self.nearEnd, self.backdrop = None, None, None
             self.items, self.selected, self.width = [], None, 0
+            self.rendered = collections.OrderedDict()     # cache key -> NSImage of an item, most recent last
         return self
 
     def acceptsFirstResponder(self):
         return True
+
+    def isOpaque(self):
+        return True       # it paints every pixel, so the scroll view can copy what's already drawn
 
     def watch(self):
         clip = self.superview()
@@ -157,8 +181,31 @@ class CanvasView(LibraryFlipped):
         else:
             paint.fill(rect, "#ffffff")
         for it in self.items:
-            if NSIntersectsRect(rect, it["rect"]):
+            r = it["rect"]
+            if not NSIntersectsRect(rect, NSInsetRect(r, -PAD, -PAD)):
+                continue
+            key = it.get("cache") and it["cache"](it)
+            if not key:
                 it["draw"](it, it is self.selected)
+                continue
+            img = self.rendered.pop(key, None) or self.render(it)
+            self.rendered[key] = img
+            while len(self.rendered) > 160:
+                self.rendered.popitem(last=False)
+            img.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+                NSInsetRect(r, -PAD, -PAD), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
+
+    def render(self, it):
+        """Draw an item once into a bitmap the size it's shown at, shadow and all."""
+        r = it["rect"]
+        img = NSImage.alloc().initWithSize_(NSMakeSize(r.size.width + 2 * PAD, r.size.height + 2 * PAD))
+        img.lockFocusFlipped_(True)
+        t = NSAffineTransform.transform()
+        t.translateXBy_yBy_(PAD - r.origin.x, PAD - r.origin.y)
+        t.concat()
+        it["draw"](it, False)
+        img.unlockFocus()
+        return img
 
     def itemAt(self, event):
         p = self.convertPoint_fromView_(event.locationInWindow(), None)
@@ -1449,7 +1496,7 @@ class Library(NSObject):
                 cell_h = d + 30
                 rect = NSMakeRect(pad + c * (cw + gap), 22 + r * (cell_h + 22), cw, cell_h)
                 out.append({"rect": rect, "data": it, "draw": lambda e, s, d=d: draw_artist_cell(e, d, canvas),
-                            "click": lambda e: self.go(("artist", e["data"]["id"]))})
+                            "click": lambda e: self.go(("artist", e["data"]["id"])), "cache": circle_key})
         rows = (len(items) + cols - 1) // cols
         if round_:
             canvas.backdrop = None
@@ -1458,26 +1505,30 @@ class Library(NSObject):
 
     def shelfItems(self, width, items):
         """Albums as tapes standing on walnut shelves."""
-        canvas = self.gridCanvas
+        out, height = self.shelf(self.gridCanvas, width, items, 0, 2)
+        self.gridCanvas.backdrop = draw_wall
+        return out, height
+
+    def shelf(self, canvas, width, items, top, min_rows):
+        """Shelf boards and tapes from `top` down; returns the items and where the shelf ends."""
         pad, gap = 28, 24
         cols = max(2, int((width - 2 * pad + gap) // (100 + gap)))
         cw = (width - 2 * pad - (cols - 1) * gap) / float(cols)
         ch = cw * CASE_RATIO
         row_h = 26 + ch + 40
         out = []
-        rows = max(2, (len(items) + cols - 1) // cols)
+        rows = max(min_rows, (len(items) + cols - 1) // cols)
         for r in range(rows):
-            board_y = 26 + r * row_h + ch - 2
+            board_y = top + 26 + r * row_h + ch - 2
             out.append({"rect": NSMakeRect(0, board_y, width, 34), "draw": lambda e, s, by=board_y: draw_board(width, by)})
         for i, it in enumerate(items):
             r, c = divmod(i, cols)
-            rect = NSMakeRect(pad + c * (cw + gap), 26 + r * row_h, cw, ch)
+            rect = NSMakeRect(pad + c * (cw + gap), top + 26 + r * row_h, cw, ch)
             out.append({"rect": rect, "data": it, "click": lambda e: self.go(("album", e["data"]["id"])),
-                        "menu": lambda e: self.albumMenu(e["data"]),
+                        "menu": lambda e: self.albumMenu(e["data"]), "cache": case_key,
                         "draw": lambda e, s: draw_case(e["rect"], canvas, e["data"]["image"], e["data"]["name"],
                                                        e["data"]["artist"], e["data"]["year"])})
-        canvas.backdrop = draw_wall
-        return out, 26 + rows * row_h + 10
+        return out, top + 26 + rows * row_h + 10
 
     def albumMenu(self, album):
         menu = NSMenu.alloc().initWithTitle_(u"Album")
@@ -1522,6 +1573,7 @@ class Library(NSObject):
 
     def renderArtist(self, top):
         self.showPage(self.canvasPage)
+        self.canvas.backdrop = None
         a = self.artist
         self.canvas.builder = lambda width: self.artistItems(width, a)
         self.canvas.nearEnd = None
@@ -1550,43 +1602,41 @@ class Library(NSObject):
         cocoa.in_background(lambda: (client.unsave if following else client.save)([a["info"]["uri"]]), done)
 
     def artistItems(self, width, a):
+        """The header, then the popular songs across the page in up to two columns of five, then the
+        albums and singles standing on a shelf that runs the full width, so the page stays balanced."""
         canvas, info = self.canvas, a["info"]
         items = [{"rect": NSMakeRect(0, 0, width, ARTIST_HEAD), "draw": lambda e, s: draw_artist_header(e, info, canvas)}]
-        right_w = 300
-        left_w = width - 26 * 3 - right_w
         y0 = ARTIST_HEAD + 16
-        items.append({"rect": NSMakeRect(26, y0, left_w, 22), "draw": lambda e, s: draw_section(e, u"Popular")})
-        songs = a["songs"] if a["more"] else a["songs"][:5]
-        uris = [t["uri"] for t in a["songs"]]
+        inner = width - 52
+        items.append({"rect": NSMakeRect(26, y0, inner, 22), "draw": lambda e, s: draw_section(e, u"Popular")})
+        songs = a["songs"][:10]
+        uris = [t["uri"] for t in songs]
+        cols = 2 if len(songs) > 5 and inner >= 640 else 1
+        col_w = (inner - 26 * (cols - 1)) / float(cols)
+        per_col = (len(songs) + cols - 1) // cols if cols > 1 else len(songs)
         for i, t in enumerate(songs):
-            rect = NSMakeRect(26, y0 + 22 + i * 34, left_w, 34)
+            c, r = divmod(i, per_col) if cols > 1 else (0, i)
+            rect = NSMakeRect(26 + c * (col_w + 26), y0 + 22 + r * 34, col_w, 34)
             items.append(self.songItem(rect, t, i, lambda i=i: self.app.playFrom(None, None, uris[i:], 0, None),
                                        show_album=True))
-        y = y0 + 22 + len(songs) * 34
-        if not a["songs"]:
-            items.append({"rect": NSMakeRect(26, y + 8, left_w, 20),
+        y = y0 + 22 + per_col * 34
+        if not songs:
+            items.append({"rect": NSMakeRect(26, y + 8, inner, 20),
                           "draw": lambda e, s: paint.text(u"Spotify found no songs for this artist.", e["rect"],
                                                           paint.ui(12), "#6b6b6b")})
             y += 30
-        elif len(a["songs"]) > 5:
-            label = u"Show Fewer" if a["more"] else u"Show %d More" % (len(a["songs"]) - 5)
-
-            def toggle(e):
-                a["more"] = not a["more"]
-                self.renderArtist(False)
-            items.append({"rect": NSMakeRect(26, y + 6, 120, 18), "click": toggle,
-                          "draw": lambda e, s: paint.text(label, e["rect"], paint.ui(11, True), "#2f6fd1")})
-            y += 28
-        rx = 26 + left_w + 26
-        items.append({"rect": NSMakeRect(rx, y0, right_w, 22), "draw": lambda e, s: draw_section(e, u"Albums")})
-        cw = (right_w - 24) / 3.0
-        for i, alb in enumerate(a["albums"]):
-            r, c = divmod(i, 3)
-            rect = NSMakeRect(rx + c * (cw + 12), y0 + 34 + r * (cw * CASE_RATIO + 16), cw, cw * CASE_RATIO)
-            items.append({"rect": rect, "data": alb, "draw": lambda e, s: draw_album_cell(e, canvas, year=True),
-                          "click": lambda e: self.go(("album", e["data"]["id"])), "menu": lambda e: self.albumMenu(e["data"])})
-        rows = (len(a["albums"]) + 2) // 3
-        return items, max(y, y0 + 34 + rows * (cw * CASE_RATIO + 16)) + 24
+        y += 22
+        items.append({"rect": NSMakeRect(26, y, inner, 22), "draw": lambda e, s: draw_section(
+            e, u"Albums and Singles" if a["albums"] else u"No albums on Spotify")})
+        wall_top = y + 30
+        shelf, end = self.shelf(canvas, width, a["albums"], wall_top, 1)
+        for it in shelf:
+            if "data" in it:
+                it["draw"] = lambda e, s: draw_album_cell(e, canvas)
+        items += shelf
+        canvas.backdrop = lambda rect: (paint.fill(rect, "#ffffff"), draw_wall(
+            NSIntersectionRect(rect, NSMakeRect(0, wall_top, width, 1e6))))
+        return items, end
 
     def songItem(self, rect, t, n, play, show_album=False):
         canvas = self.canvas
@@ -1609,6 +1659,7 @@ class Library(NSObject):
             songs, artists, albums = result
             self.found = (text, songs, artists, albums)
             self.showPage(self.canvasPage)
+            self.canvas.backdrop = None
             self.canvas.builder = lambda width: self.searchItems(width)
             self.canvas.nearEnd = None
             self.canvas.rebuild()
@@ -1664,7 +1715,7 @@ class Library(NSObject):
             for i, a in enumerate(artists[:fit]):
                 rect = NSMakeRect(24 + i * (72 + 26) - 8, y + 32, 88, 98)
                 items.append({"rect": rect, "data": a, "draw": lambda e, s: draw_artist_cell(e, 72, canvas, small=True),
-                              "click": lambda e: self.go(("artist", e["data"]["id"]))})
+                              "click": lambda e: self.go(("artist", e["data"]["id"])), "cache": circle_key})
             y += 32 + 98 + 10
         if albums:
             items.append({"rect": NSMakeRect(24, y, width - 48, 22), "draw": lambda e, s: draw_section(e, u"Albums")})
@@ -1673,7 +1724,7 @@ class Library(NSObject):
                 rect = NSMakeRect(24 + i * (104 + 20), y + 32, 96, 96 * CASE_RATIO)
                 items.append({"rect": rect, "data": alb, "draw": lambda e, s: draw_album_cell(e, canvas),
                               "click": lambda e: self.go(("album", e["data"]["id"])),
-                              "menu": lambda e: self.albumMenu(e["data"])})
+                              "menu": lambda e: self.albumMenu(e["data"]), "cache": case_key})
             y += 32 + 96 * CASE_RATIO + 14
         return items, y + 10
 
