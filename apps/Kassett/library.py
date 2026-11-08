@@ -21,6 +21,7 @@ import art
 import glyphs
 import paint
 from paint import hexc, white
+import deck
 from deck import INK
 
 SIDEBAR = 210
@@ -705,7 +706,28 @@ class ToolbarLCDView(LibraryFlipped):
         self = super(ToolbarLCDView, self).initWithFrame_(frame)
         if self:
             self.line1, self.line2, self.p, self.onClick = u"Kassett", u"Nothing playing", 0.0, None
+            self.links, self.hits, self.onLink = None, [], None
         return self
+
+    def setLinks(self, links):
+        self.links = links
+        self.hits = self.layOut(False)
+        if self.window():
+            self.window().invalidateCursorRectsForView_(self)
+        self.setNeedsDisplay_(True)
+
+    def layOut(self, draw):
+        if not self.links:
+            return []
+        w = self.bounds().size.width - 1
+        tw = min(w - 24, paint.text_width(self.line1, paint.ui(11, True)))
+        hits = [(NSMakeRect((w - tw) / 2.0, 3, tw, 13), self.links["title"])]
+        return hits + deck.lay_out_links(deck.line_segments(self.links), 12, 15, w - 24, paint.ui(10), "#464840",
+                                         center=True, draw=draw)
+
+    def resetCursorRects(self):
+        for r, _ in self.hits:
+            self.addCursorRect_cursor_(r, NSCursor.pointingHandCursor())
 
     def drawRect_(self, rect):
         b = NSMakeRect(0.5, 0.5, self.bounds().size.width - 1, self.bounds().size.height - 2)
@@ -726,13 +748,20 @@ class ToolbarLCDView(LibraryFlipped):
             self.bounds(), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
         w = b.size.width
         paint.text(self.line1, NSMakeRect(12, 3, w - 24, 14), paint.ui(11, True), "#282a24", NSCenterTextAlignment)
-        paint.text(self.line2, NSMakeRect(12, 15, w - 24, 13), paint.ui(10), "#464840", NSCenterTextAlignment)
+        if self.links:
+            self.hits = self.layOut(True)
+        else:
+            paint.text(self.line2, NSMakeRect(12, 15, w - 24, 13), paint.ui(10), "#464840", NSCenterTextAlignment)
         track = NSMakeRect((w - 300) / 2.0, 28, 300, 3)
         paint.fill(paint.rounded(track, 1.5), white(0, 0.18))
         if self.p:
             paint.fill(paint.rounded(NSMakeRect(track.origin.x, 28, max(3, 300 * self.p), 3), 1.5), "#3c4036")
 
     def mouseDown_(self, event):
+        p = deck.point_at(self, event)
+        for r, target in self.hits:
+            if NSPointInRect(p, r) and self.onLink:
+                return self.onLink(target)
         if self.onClick:
             self.onClick()
 
@@ -953,6 +982,7 @@ class Library(NSObject):
         elif ident == "lcd":
             view = ToolbarLCDView.alloc().initWithFrame_(NSMakeRect(0, 0, 380, 35))
             view.onClick = lambda: self.app.showDeck_(None)
+            view.onLink = self.app.followLink
             view.setToolTip_(u"Show the cassette deck")
             self.lcd = view
             label = u"Now Playing"
@@ -1006,6 +1036,10 @@ class Library(NSObject):
             self.playing_uri = uri
             self.list.refreshPlaying()
             self.canvas.setNeedsDisplay_(True)
+
+    def setLinks(self, links):
+        if hasattr(self, "lcd"):
+            self.lcd.setLinks(links)
 
     def showProgress(self, progress, duration):
         if hasattr(self, "lcd"):
@@ -1264,6 +1298,11 @@ class Library(NSObject):
         self.list.show(kind, source, first_page, total, header, saved)
         self.showPage(self.list.view)
         self.window.makeFirstResponder_(self.list.table)
+        uri, self.reveal_uri = getattr(self, "reveal_uri", None), None
+        rows = [i for i, r in enumerate(self.list.rows) if uri and r["uri"] == uri]
+        if rows:       # opened from the playing song: pick it in the list
+            self.list.table.selectRowIndexes_byExtendingSelection_(NSIndexSet.indexSetWithIndex_(rows[0]), False)
+            self.list.table.scrollRowToVisible_(rows[0])
         self.listStatus()
         self.queueMore(next_offset, fetch_page, total, album)
 

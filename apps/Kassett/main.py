@@ -140,7 +140,9 @@ class AppDelegate(NSObject):
                      (u"Next Song", "next:", right, cmd), (u"Previous Song", "previous:", left, cmd),
                      (u"Forward 15 Seconds", "fastForward:", right, cmd | opt),
                      (u"Back 15 Seconds", "rewind:", left, cmd | opt), None,
-                     (u"Volume Up", "volumeUp:", up, cmd), (u"Volume Down", "volumeDown:", down, cmd)):
+                     (u"Volume Up", "volumeUp:", up, cmd), (u"Volume Down", "volumeDown:", down, cmd), None,
+                     (u"Show Current Song in Library", "showCurrentSong:", "l", cmd | opt),
+                     (u"Go to Current Artist", "showCurrentArtist:", "", 0)):
             if spec is None:
                 controls.addItem_(NSMenuItem.separatorItem())
                 continue
@@ -159,6 +161,8 @@ class AppDelegate(NSObject):
             return self.loggedIn()
         if action in ("next:", "previous:", "fastForward:", "rewind:"):
             return has_item
+        if action in ("showCurrentSong:", "showCurrentArtist:"):
+            return deck.song_links(self.item()) is not None
         if action in ("volumeUp:", "volumeDown:"):
             return self.volume() is not None
         if action == "toggleMini:":
@@ -212,6 +216,7 @@ class AppDelegate(NSObject):
 
     def showNothing(self):
         self.item_id = None
+        self.showLinks(None)
         self.deck.setTape(u"Nothing playing", u"Pick a song in the library, or start Spotify on a device")
         self.deck.setArt(None, u"", True)
         self.deck.setPlaying(False, False)
@@ -225,6 +230,73 @@ class AppDelegate(NSObject):
             self.deck.setStatus(u"Spotify isn’t playing on any device right now")
         if self.library:
             self.library.showState(self.state, 0)
+
+    def showLinks(self, links):
+        self.deck.setLinks(links)
+        self.mini.setLinks(links)
+        if self.library:
+            self.library.setLinks(links)
+
+    # ---- from the playing song into the library ----------------------------------------------------
+    def followLink(self, target):
+        kind, object_id, song_uri = target
+        if not object_id:
+            return
+        self.showLibrary_(None)
+        self.library.reveal_uri = song_uri
+        self.library.go((kind, object_id))
+
+    def showCurrentSong_(self, sender):
+        links = deck.song_links(self.item())
+        if links:
+            self.followLink(links["title"])
+
+    def showCurrentArtist_(self, sender):
+        links = deck.song_links(self.item())
+        if links and links["artists"]:
+            self.followLink(links["artists"][0][1])
+
+    def nowPlayingMenu(self):
+        """Right-click on the cassette, the LCD or the mini player."""
+        links = deck.song_links(self.item())
+        if not links:
+            return None
+        menu = NSMenu.alloc().initWithTitle_(u"Now Playing")
+        menu.setAutoenablesItems_(False)
+
+        def add(title, target):
+            item = menu.addItemWithTitle_action_keyEquivalent_(title, "followLinkItem:", "")
+            item.setTarget_(self)
+            item.setRepresentedObject_(list(target))
+            item.setEnabled_(bool(target[1]))
+        add(u"Show in Library", links["title"])
+        album_name, album_target = links["album"]
+        add(u"Go to Album \u201c%s\u201d" % album_name, album_target)
+        for name, target in links["artists"]:
+            add(u"Go to Artist \u201c%s\u201d" % name, target)
+        menu.addItem_(NSMenuItem.separatorItem())
+        like = menu.addItemWithTitle_action_keyEquivalent_(u"Add to Liked Songs", "likeCurrent:", "")
+        like.setTarget_(self)
+        return menu
+
+    def followLinkItem_(self, sender):
+        self.followLink(tuple(sender.representedObject()))
+
+    def likeCurrent_(self, sender):
+        item = self.item()
+        if not item or self.fake:
+            return
+
+        def done(_, error):
+            if error:
+                return self.flash(unicode(error))
+            self.note(u"Added \u201c%s\u201d to Liked Songs." % item.get("name"))
+        cocoa.in_background(lambda: self.client.save([item["uri"]]), done)
+
+    def note(self, text):
+        """A short message in the bottom bar (like flash, without the warning sign)."""
+        self.flash_text, self.flash_until = text, time.time() + 4
+        self.applyStatus()
 
     def estimatedProgress(self):
         item = self.item()
@@ -287,6 +359,7 @@ class AppDelegate(NSObject):
         dev = self.state.get("device") or {}
         self.controllable = not dev.get("is_restricted")
         self.deck.setTape(info["title"], subtitle(info))
+        self.showLinks(deck.song_links(item))
         self.deck.setPlaying(self.isPlaying(), True, self.controllable)
         self.showPosition(progress, jumped)
         if time.time() < getattr(self, "volume_hold", 0):
@@ -532,6 +605,7 @@ class AppDelegate(NSObject):
             import library
             self.library = library.Library.alloc().initWithApp_(self)
             self.library.showState(self.state, self.estimatedProgress())
+            self.library.setLinks(deck.song_links(self.item()))
         self.library.window.makeKeyAndOrderFront_(None)
 
     def warmUp_(self, _):
@@ -829,6 +903,10 @@ class AppDelegate(NSObject):
             self.ownApp.showFor(self.deck.window)
             if view == "ownapp-guide":
                 self.ownApp.showGuide_(None)
+        elif view == "song-album":
+            self.showCurrentSong_(None)
+        elif view == "song-artist":
+            self.showCurrentArtist_(None)
         elif view == "bench":
             self.showLibrary_(None)
             self.library.bench()

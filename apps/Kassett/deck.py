@@ -210,6 +210,9 @@ class CassetteView(FlippedView):
     def mouseDownCanMoveWindow(self):
         return True
 
+    def menuForEvent_(self, event):
+        return self.onMenu() if getattr(self, "onMenu", None) else None
+
     def hubs(self):
         sx, sy = self.SHELL
         return [(sx + x, sy + y) for x, y in HUB_XY]
@@ -821,6 +824,60 @@ class WheelView(FlippedView):
         self.change(self.volume, True)
 
 
+# ---- links from the playing song into the library ----------------------------------------------------
+def song_links(item):
+    """What the playing song can lead to: its title opens its album with the song picked, each artist
+    opens that artist, the album name opens the album. None for podcasts or when nothing plays.
+    Targets are ("album" or "artist", Spotify ID, song URI to pick or None)."""
+    if not item or item.get("type") == "episode":
+        return None
+    album = item.get("album") or {}
+    return {"title": ("album", album.get("id"), item.get("uri")),
+            "artists": [(a.get("name") or u"", ("artist", a.get("id"), None)) for a in item.get("artists") or []],
+            "album": (album.get("name") or u"", ("album", album.get("id"), None)),
+            "year": (album.get("release_date") or u"")[:4]}
+
+
+def line_segments(links):
+    """The second line in pieces: the artists, a dash, the album and its year."""
+    segs = []
+    names = []
+    for i, (name, target) in enumerate(links["artists"]):
+        if i:
+            segs.append((u", ", None))
+        segs.append((name, target))
+        names.append(name)
+    name, target = links["album"]
+    if name and name not in names:
+        segs += [(u" \u2014 ", None), (name, target)]
+    if links["year"]:
+        segs.append((u" (%s)" % links["year"], None))
+    return segs
+
+
+def lay_out_links(segs, x, y, width, f, color, center=False, draw=True):
+    """Draw (or only measure) the pieces of one line; return [(rect, target)] for the clickable ones."""
+    widths = [paint.text_width(t, f) for t, _ in segs]
+    total = sum(widths)
+    if center and total < width:
+        x += (width - total) / 2.0
+    hits, end = [], x + width
+    for (t, target), w in zip(segs, widths):
+        if x >= end - 4:
+            break
+        room = min(w, end - x)
+        if draw:
+            paint.text(t, NSMakeRect(x, y, room + 1, 16), f, color)
+        if target and target[1]:
+            hits.append((NSMakeRect(x, y, room, 15), target))
+        x += w
+    return hits
+
+
+def point_at(view, event):
+    return view.convertPoint_fromView_(event.locationInWindow(), None)
+
+
 # ---- the LCD under the cassette ----------------------------------------------------------------------
 class LCDView(FlippedView):
     """iTunes 10's status display: the cover, title, artist and times. Click or drag along it to seek."""
@@ -832,10 +889,35 @@ class LCDView(FlippedView):
             self.art, self.name = None, u""
             self.p, self.elapsed, self.remaining = 0.0, u"", u""
             self.enabled, self.dragging, self.onSeek = False, False, None
+            self.links, self.hits, self.onLink, self.onMenu = None, [], None, None
         return self
 
     def mouseDownCanMoveWindow(self):
         return False
+
+    def setLinks(self, links):
+        """Make the title, the artists and the album clickable (or plain text again with None)."""
+        self.links = links
+        self.hits = self.layOut(False)
+        if self.window():
+            self.window().invalidateCursorRectsForView_(self)
+        self.setNeedsDisplay_(True)
+
+    def layOut(self, draw):
+        if not self.links:
+            return []
+        w = self.bounds().size.width
+        tx, tw = 54, w - 54 - 70
+        title_w = min(tw, paint.text_width(self.line1, paint.ui(12, True)))
+        hits = [(NSMakeRect(8, 7, 36, 36), self.links["title"]), (NSMakeRect(tx, 6, title_w, 16), self.links["title"])]
+        return hits + lay_out_links(line_segments(self.links), tx, 21, tw, paint.ui(11), "#464840", draw=draw)
+
+    def resetCursorRects(self):
+        for r, _ in self.hits:
+            self.addCursorRect_cursor_(r, NSCursor.pointingHandCursor())
+
+    def menuForEvent_(self, event):
+        return self.onMenu() if self.onMenu else None
 
     def drawRect_(self, rect):
         w, h = self.bounds().size.width, self.bounds().size.height - 1
@@ -861,7 +943,10 @@ class LCDView(FlippedView):
         paint.stroke(NSBezierPath.bezierPathWithRect_(NSInsetRect(cover, -0.5, -0.5)), white(0, 0.3), 1)
         tx, tw = 54, w - 54 - 70
         paint.text(self.line1, NSMakeRect(tx, 6, tw, 16), paint.ui(12, True), "#282a24")
-        paint.text(self.line2, NSMakeRect(tx, 21, tw, 15), paint.ui(11), "#464840")
+        if self.links:
+            self.hits = self.layOut(True)
+        else:
+            paint.text(self.line2, NSMakeRect(tx, 21, tw, 15), paint.ui(11), "#464840")
         paint.text(self.remaining, NSMakeRect(w - 64, 7, 54, 15), paint.ui(11, True), "#282a24", NSRightTextAlignment)
         paint.text(self.elapsed, NSMakeRect(w - 64, 21, 54, 15), paint.ui(10), "#464840", NSRightTextAlignment)
         if self.elapsed:
@@ -874,6 +959,12 @@ class LCDView(FlippedView):
         return max(0.0, min(1.0, (x - 54) / float(self.bounds().size.width - 54 - 12)))
 
     def mouseDown_(self, event):
+        p = point_at(self, event)
+        if p.y < 34:          # the text: links into the library; the bar along the bottom seeks
+            for r, target in self.hits:
+                if NSPointInRect(p, r) and self.onLink:
+                    self.onLink(target)
+            return
         if self.enabled and self.elapsed:
             self.dragging = True
             self.p = self.fraction(event)
@@ -1000,6 +1091,9 @@ class Deck(NSObject):
         deck.addSubview_(self.cassette)
         self.lcd = LCDView.alloc().initWithFrame_(NSMakeRect(18, 354, 452, 51))
         self.lcd.onSeek = self.app.seekToFraction
+        self.lcd.onLink = self.app.followLink
+        self.lcd.onMenu = self.app.nowPlayingMenu
+        self.cassette.onMenu = self.app.nowPlayingMenu
         deck.addSubview_(self.lcd)
 
         # Four big keys down the silver strip, lined up with the cassette window, and the volume wheel
@@ -1050,6 +1144,9 @@ class Deck(NSObject):
     def setArt(self, img, name, blank):
         self.lcd.art, self.lcd.name = img, (u"" if blank else name)
         self.lcd.setNeedsDisplay_(True)
+
+    def setLinks(self, links):
+        self.lcd.setLinks(links)
 
     def setStatus(self, text, glyph=None):
         self.status.setStringValue_(text)
@@ -1163,6 +1260,30 @@ class MiniView(FlippedView):
     def mouseDownCanMoveWindow(self):
         return True
 
+    def hits(self):
+        links = getattr(self, "links", None)
+        if not links:
+            return []
+        w = MINI_STRIP - 122 - 14
+        out = [(NSMakeRect(122, 22, min(w, paint.text_width(self.title, paint.ui(13, True))), 18), links["title"])]
+        if links["artists"]:
+            out.append((NSMakeRect(122, 40, min(w, paint.text_width(self.artist, paint.ui(11))), 16), links["artists"][0][1]))
+        return out
+
+    def resetCursorRects(self):
+        for r, _ in self.hits():
+            self.addCursorRect_cursor_(r, NSCursor.pointingHandCursor())
+
+    def mouseDown_(self, event):
+        p = point_at(self, event)
+        for r, target in self.hits():
+            if NSPointInRect(p, r) and getattr(self, "onLink", None):
+                return self.onLink(target)
+        super(MiniView, self).mouseDown_(event)
+
+    def menuForEvent_(self, event):
+        return self.onMenu() if getattr(self, "onMenu", None) else None
+
     def drawRect_(self, rect):
         b = self.bounds()
         if self.bg is None:
@@ -1259,6 +1380,7 @@ class Mini(NSObject):
             p.center()
         p.setDelegate_(self)
         self.view = MiniView.alloc().initWithFrame_(p.contentView().bounds())
+        self.view.onLink, self.view.onMenu = app.followLink, app.nowPlayingMenu
         p.contentView().addSubview_(self.view)
         x, y = MINI_STRIP + 12, 26
         self.prevButton = make_key(self.view, NSMakeRect(x, y, 40, 42), "prev", u"Previous song", app, "previous:")
@@ -1268,6 +1390,10 @@ class Mini(NSObject):
                                      u"Show the cassette player", app, "showDeck:")
         self.window = p
         return self
+
+    def setLinks(self, links):
+        self.view.links = links
+        self.window.invalidateCursorRectsForView_(self.view)
 
     def show(self, title, artist, p, playing, has_track):
         v = self.view
