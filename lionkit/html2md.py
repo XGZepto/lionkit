@@ -14,7 +14,7 @@ from lionkit import markdown
 
 # Bump whenever the same HTML would convert to different Markdown: Planchette re-pulls posts it
 # converted with an older version (unless they have unsaved edits).
-VERSION = 3
+VERSION = 4
 
 # Attributes the site adds by itself when it renders a post, so losing them changes nothing.
 GENERATED = {"img": ("loading", "srcset", "sizes"), "h1": ("id",), "h2": ("id",), "h3": ("id",),
@@ -160,7 +160,7 @@ def block(node):
         img = next((c for c in node.children if isinstance(c, Node) and c.tag == "img"), None)
         cap = next((c for c in node.children if isinstance(c, Node) and c.tag == "figcaption"), None)
         if img is not None:
-            caption = re.sub(r"\s+", u" ", text_of(cap)).strip().replace(u'"', u"”") if cap else u""
+            caption = _escape(re.sub(r"\s+", u" ", text_of(cap)).strip()).replace(u'"', u'\\"') if cap else u""
             title = u' "%s"' % caption if caption else u""
             return u"![%s](%s%s)" % (img.attrs.get("alt", u""), img.attrs.get("src", u""), title)
     if t == "img":

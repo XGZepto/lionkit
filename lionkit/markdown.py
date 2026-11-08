@@ -9,7 +9,8 @@ on their own line:  ![alt](src "caption")  which become Ghost image cards (<figu
 import cgi
 import re
 
-_IMG_LINE = re.compile(r'^!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)\s*$')
+_IMG_LINE = re.compile(r'^!\[([^\]]*)\]\((\S+?)(?:\s+"((?:[^"\\]|\\.)*)")?\)\s*$')  # caption may hold \"
+_ANY_IMG = re.compile(r'!\[([^\]]*)\]\((\S+?)(?:\s+"(?:[^"\\]|\\.)*")?\)')
 _INLINE_IMG = re.compile(r'!\[([^\]]*)\]\((\S+?)\)')
 _LINK = re.compile(r'\[([^\]]+)\]\((\S+?)\)')
 _BOLD = re.compile(r'\*\*(.+?)\*\*')
@@ -61,7 +62,7 @@ def inline_lines(lines):
 
 def image_srcs(md):
     """All image sources referenced in the document (for uploading local files)."""
-    return [m.group(2) for m in _INLINE_IMG.finditer(md)]
+    return [m.group(2) for m in _ANY_IMG.finditer(md)]  # with or without a caption
 
 
 def to_html(md, images=None):
@@ -113,7 +114,7 @@ def to_html(md, images=None):
         elif _IMG_LINE.match(stripped):
             flush()
             alt, src, caption = _IMG_LINE.match(stripped).groups()
-            cap = "<figcaption>%s</figcaption>" % inline(caption) if caption else ""
+            cap = "<figcaption>%s</figcaption>" % inline(caption.replace('\\"', '"')) if caption else ""
             out.append('<figure class="kg-card kg-image-card%s"><img src="%s" class="kg-image" alt="%s"%s>%s</figure>'
                        % (" kg-card-hascaption" if caption else "", src, esc(alt), size(src), cap))
         elif stripped.startswith(">"):

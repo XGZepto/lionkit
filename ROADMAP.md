@@ -100,7 +100,7 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** review (only real full screen is unchecked) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** review (the user is trying full screen again) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
 Done and checked on the Mac (screenshots, or the app's own snapshot while the screen was locked):
 - The status line, title and rule scroll with the text, so a long title never hides the first line
@@ -122,8 +122,14 @@ Done and checked on the Mac (screenshots, or the app's own snapshot while the sc
 - Even line spacing for Chinese text (fixed body line height); far-off dates show their year; a new
   post's row in the post list follows its title as it's typed.
 
+- After the user's full-screen test: full screen keeps the preview as it was and only hides the
+  post list; the preview skips redrawing when nothing changed and isn't updated while hidden; big
+  pictures get small JPEG preview copies (sips, in the background); pictures with width and height
+  attributes no longer stretch. Captions can hold quotes (`\"`), and captioned local pictures now
+  upload (they didn't match before). Round trip: identical on all 12 posts, 1 block kept as a card.
+
 Waiting on the user:
-- Try real full screen (⌃⌘F); entering it over SSH would switch the user's Space.
+- Try full screen and opening the preview there again, and say whether the lag is gone.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 

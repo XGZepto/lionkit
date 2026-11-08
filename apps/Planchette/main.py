@@ -64,9 +64,9 @@ body { font: 17px/1.65 Georgia, serif; color: #2b2622; background: #fcf9f1; marg
 #page { max-width: 640px; margin: 0 auto; padding: 30px 34px 90px; }
 h1.title { font: 34px/1.2 'Hoefler Text', Georgia, serif; margin: 0 0 6px; }
 .meta { font: 12px 'Lucida Grande', sans-serif; color: #a3968a; margin-bottom: 26px; }
-.feature { width: 100%; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); margin-bottom: 26px; }
+.feature { width: 100%; height: auto; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.25); margin-bottom: 26px; }
 h2, h3 { font-family: 'Hoefler Text', Georgia, serif; margin-top: 32px; }
-img { max-width: 100%; border-radius: 3px; box-shadow: 0 1px 5px rgba(0,0,0,.25); }
+img { max-width: 100%; height: auto; border-radius: 3px; box-shadow: 0 1px 5px rgba(0,0,0,.25); }
 figure { margin: 26px 0; }
 figcaption { font-size: 13px; color: #7a6f64; text-align: center; margin-top: 7px; font-style: italic; }
 pre { background: #2b2622; color: #f3ead8; padding: 12px 14px; border-radius: 6px; overflow-x: auto;
@@ -264,6 +264,38 @@ def viewable(path):
     if not os.path.exists(png):
         subprocess.call([DWEBP, path, "-o", png], stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
     return png if os.path.exists(png) else path
+
+
+PREVIEW_SIZE = 1400     # px; the preview column is never wider, even in full screen
+SMALL_ENOUGH = 300 * 1024
+
+
+def shown_path(path, ext):
+    """Where the preview's copy of a local picture goes: WebP converted, big photos scaled down
+    and saved as JPEG, because decoding a 2 MB photo whenever the preview lays out is slow here."""
+    return os.path.join(IMAGE_CACHE, hashlib.sha1(path.encode("utf-8")).hexdigest() + "-shown" + ext)
+
+
+def shown_copy(path):
+    """The file the preview can show right away, or None while its copy still has to be made."""
+    if path.lower().endswith(".gif"):
+        return path  # sips would stop it moving
+    for ext in (".jpg", ".png"):
+        if os.path.exists(shown_path(path, ext)):
+            return shown_path(path, ext)
+    if not path.lower().endswith(".webp") and os.path.getsize(path) <= SMALL_ENOUGH:
+        return path
+    return None
+
+
+def make_shown_copy(path):
+    """Slow (dwebp, sips): call it off the main thread. PNGs with transparency stay PNGs."""
+    source = viewable(path)
+    rep = NSBitmapImageRep.imageRepWithContentsOfFile_(source) if source.lower().endswith(".png") else None
+    ext = ".png" if rep is not None and rep.hasAlpha() else ".jpg"
+    subprocess.call(["/usr/bin/sips", "-Z", str(PREVIEW_SIZE), "-s", "format", "png" if ext == ".png" else "jpeg",
+                     "-s", "formatOptions", "high", source, "--out", shown_path(path, ext)],
+                    stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
 
 
 # ---- Markdown syntax highlighting -----------------------------------------------------------------
@@ -604,6 +636,7 @@ class AppDelegate(NSObject):
         self.loading_doc = False
         self.preview_ready = False
         self.fetching_images = set()
+        self.shrinking = set()
         self.search = u""
         cocoa.build_main_menu(
             APP_NAME, self,
@@ -759,6 +792,10 @@ class AppDelegate(NSObject):
                     cocoa.in_background(lambda: g.get_post(post_id),
                                         lambda p, e: (print("site", repr((p and p["status"], p and p.get("published_at"),
                                                                  p and p.get("email"), e))), sys.stdout.flush()))
+            elif name == "reveal":
+                found = self.textView.string().find(arg)
+                if found >= 0:
+                    self.textView.scrollRangeToVisible_(NSMakeRange(found, len(arg)))
             elif name == "top":
                 clip = self.editorScroll.contentView()
                 clip.scrollToPoint_(NSMakePoint(0, 0))
@@ -1024,16 +1061,14 @@ class AppDelegate(NSObject):
             self.defaults.setBool_forKey_(sidebar.isHidden(), "postListHidden")
         self.layoutPanes()
 
-    # ---- full screen: just the page, the toolbar slides in with the menu bar --------------------------
+    # ---- full screen: the post list steps aside, the toolbar slides in with the menu bar --------------
     def setFocusMode(self, on):
         self.focus = on
         if on:
             self.outer.subviews()[0].setHidden_(True)
-            self.preview.setHidden_(True)
             self.inspector.orderOut_(None)
         else:
             self.outer.subviews()[0].setHidden_(self.defaults.boolForKey_("postListHidden"))
-            self.preview.setHidden_(self.defaults.boolForKey_("previewHidden"))
         self.layoutPanes()
         self.updatePreview_(None)
 
@@ -1526,14 +1561,31 @@ class AppDelegate(NSObject):
     def imageURL(self, src):
         local = media_path(src)
         if local:
-            return NSURL.fileURLWithPath_(viewable(local)).absoluteString() if os.path.exists(local) else src
+            return self.shownURL(local) if os.path.exists(local) else src
         if src.startswith("http"):
             return self.remoteImage(src)
         return src
 
+    def shownURL(self, path):
+        """A file URL for a local picture, using its small copy once that's been made."""
+        shown = shown_copy(path)
+        if shown:
+            return NSURL.fileURLWithPath_(shown).absoluteString()
+        if path not in self.shrinking:
+            self.shrinking.add(path)
+
+            def done(_, error, path=path):
+                self.shrinking.discard(path)
+                self.updatePreview_(None)
+                if self.doc and self.doc.get("feature_image") and self.imageURL(self.doc["feature_image"]).startswith("file:"):
+                    self.loadInspector()
+
+            cocoa.in_background(lambda: make_shown_copy(path), done)
+        return u"" if path.lower().endswith(".webp") else NSURL.fileURLWithPath_(path).absoluteString()
+
     def updatePreview_(self, _):
-        if not self.preview_ready or not self.doc:
-            return
+        if not self.preview_ready or not self.doc or self.preview.isHidden():
+            return  # togglePreview_ catches up when it's shown again
         d = self.doc
         body = markdown.to_html(d.get("markdown") or u"") or u'<p class="empty">Start writing on the left…</p>'
         body = re.sub(r'src="([^"]+)"', lambda m: u'src="%s"' % self.imageURL(m.group(1)), body)
@@ -1541,9 +1593,13 @@ class AppDelegate(NSObject):
         when = long_day(d.get("published_at")) if d.get("status") in ("published", "scheduled") else u""
         meta = u" · ".join(x for x in (when, u", ".join(d.get("tags") or [])) if x)
         feature = self.imageURL(d["feature_image"]) if d.get("feature_image") else u""
+        content = (d.get("title") or u"Untitled", meta, feature, body)
+        if content == getattr(self, "shown_preview", None):  # replacing the page re-lays out every picture
+            self.preview.stringByEvaluatingJavaScriptFromString_(u"scrollToRatio(%f);" % self.editorScrollRatio())
+            return
+        self.shown_preview = content
         js = u"setContent(%s, %s, %s, %s); scrollToRatio(%f);" % (
-            json.dumps(d.get("title") or u"Untitled"), json.dumps(meta), json.dumps(feature), json.dumps(body),
-            self.editorScrollRatio())
+            json.dumps(content[0]), json.dumps(meta), json.dumps(feature), json.dumps(body), self.editorScrollRatio())
         self.preview.stringByEvaluatingJavaScriptFromString_(js)
 
     def editorScrollRatio(self):
@@ -1609,13 +1665,14 @@ class AppDelegate(NSObject):
         ext = os.path.splitext(url.split("?")[0])[1][:5] or ".img"
         path = os.path.join(IMAGE_CACHE, hashlib.sha1(url.encode("utf-8")).hexdigest() + ext)
         if os.path.exists(path):
-            return NSURL.fileURLWithPath_(viewable(path)).absoluteString()
+            return self.shownURL(path)
         if url not in self.fetching_images:
             self.fetching_images.add(url)
 
             def fetch():
                 http.request("GET", url, output_path=path, timeout=60)
-                viewable(path)
+                if not shown_copy(path):
+                    make_shown_copy(path)
 
             def done(_, error):
                 self.fetching_images.discard(url)
@@ -1887,8 +1944,7 @@ class AppDelegate(NSObject):
 
     def togglePreview_(self, sender):
         self.preview.setHidden_(not self.preview.isHidden())
-        if not self.focus:
-            self.defaults.setBool_forKey_(self.preview.isHidden(), "previewHidden")
+        self.defaults.setBool_forKey_(self.preview.isHidden(), "previewHidden")
         self.layoutEditor()
         self.updatePreview_(None)
 
