@@ -781,8 +781,29 @@ class WheelView(FlippedView):
             self.change(self.volume, True)
 
     def scrollWheel_(self, event):
-        if self.enabled and (event.deltaY() or event.deltaX()):
-            self.change(self.volume + (event.deltaY() - event.deltaX()) * 2, True)
+        """Scrolling up turns it up, with or without Lion's natural scrolling. Spotify hears the
+        result once the scrolling stops, not on every event of a trackpad swipe."""
+        if not self.enabled:
+            return
+        if event.hasPreciseScrollingDeltas():          # trackpad: deltas in points, many per swipe
+            amount = event.scrollingDeltaY() * 0.25
+        else:                                          # mouse wheel: deltas in lines
+            amount = event.deltaY() * 3
+        if event.isDirectionInvertedFromDevice():
+            amount = -amount
+        if not amount:
+            return
+        self.fraction = getattr(self, "fraction", 0.0) + amount
+        steps = int(self.fraction)
+        self.fraction -= steps
+        if steps:
+            self.change(self.volume + steps, False)
+        NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "scrollEnded:", None)
+        self.performSelector_withObject_afterDelay_("scrollEnded:", None, 0.35)
+
+    def scrollEnded_(self, _):
+        self.fraction = 0.0
+        self.change(self.volume, True)
 
 
 # ---- the LCD under the cassette ----------------------------------------------------------------------

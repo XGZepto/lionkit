@@ -285,6 +285,8 @@ class AppDelegate(NSObject):
         self.deck.setTape(info["title"], subtitle(info))
         self.deck.setPlaying(self.isPlaying(), True, self.controllable)
         self.showPosition(progress, jumped)
+        if time.time() < getattr(self, "volume_hold", 0):
+            dev["volume_percent"] = self.deck.wheel.volume   # Spotify hasn't caught up with the wheel yet
         self.deck.setVolume(dev.get("volume_percent"), dev.get("supports_volume", True))
         self.applyStatus()
         self.showArt(info)
@@ -445,6 +447,7 @@ class AppDelegate(NSObject):
             return
         dev["volume_percent"] = volume
         now = time.time()
+        self.volume_hold = now + 3
         if final or now - self.volume_sent > 0.4:
             self.volume_sent = now
             self.send(lambda: self.client.set_volume(volume), 1.5)
