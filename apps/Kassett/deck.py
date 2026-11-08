@@ -10,7 +10,8 @@ import time
 
 from AppKit import *  # noqa: F401,F403
 from Foundation import *  # noqa: F401,F403
-from Quartz import CABasicAnimation, CACurrentMediaTime, CALayer
+from Quartz import (CABasicAnimation, CACurrentMediaTime, CALayer, CAMediaTimingFunction, CATransaction,
+                    CATransform3DMakeRotation, CATransformLayer, kCAMediaTimingFunctionEaseInEaseOut)
 
 import art
 import glyphs
@@ -200,6 +201,7 @@ class CassetteView(FlippedView):
             self.p = 0.0
             self.angles = [0.0, 37.0]
             self.engage, self.engaged = 0.0, False     # how far the head and pinch roller have moved in
+            self.side = None                           # ("A" or "B", tape number, C-number of minutes)
             self.bg, self.bg_key = None, None
             self.coarse = False                        # redraw the packs less often while winding fast
             self.reels = ReelView.alloc().initWithFrame_(self.bounds())
@@ -230,7 +232,7 @@ class CassetteView(FlippedView):
     def key(self):
         left, right = pack_radii(self.p)
         step = 6.0 if self.coarse else 1.0
-        return (self.title, self.subtitle, self.shell, int(left * 2 / step), int(right * 2 / step))
+        return (self.title, self.subtitle, self.shell, self.side, int(left * 2 / step), int(right * 2 / step))
 
     def spin(self, speed):
         """Turn the reels at `speed` times play speed (0 stops them, negative rewinds): the tape
@@ -263,16 +265,33 @@ class CassetteView(FlippedView):
             draw_mechanism(sx, sy, ease(self.engage), self.shell == "clear")
 
     def drawBody(self):
+        self.drawBay()
+        self.drawTape()
+
+    def drawTape(self):
+        sx, sy = self.SHELL
+        draw_cassette(sx, sy, self.shell, self.title, self.subtitle, self.p, self.side)
+        for cx, cy in self.hubs():          # the hubs' shadows on the tape; the hubs are layers on top
+            paint.with_shadow(paint.shadow(1, 3, white(0, 0.6)), lambda: paint.fill(paint.oval(cx, cy, HUB - 1), "#3a2a1e"))
+
+    def bayImage(self):
+        return flipped_image(452, 286, self.drawBay)
+
+    def tapeImage(self):
+        """The cassette alone, hubs included, for turning it over."""
+        def body():
+            self.drawTape()
+            for cx, cy in self.hubs():
+                draw_hub(cx, cy, 0)
+        return flipped_image(452, 286, body)
+
+    def drawBay(self):
         paint.fill(paint.rounded(NSOffsetRect(self.WELL, 0, 1), 10), white(1, 0.85))
         paint.fill(paint.rounded(self.WELL, 10), "#f6f6f6", "#9b9b9b")          # the chrome door frame
         paint.stroke(paint.rounded(NSInsetRect(self.WELL, 0.5, 0.5), 9.5), white(0, 0.38))
         bay = paint.rounded(NSInsetRect(self.WELL, 4, 4), 7)
         paint.fill(bay, "#121315", "#222428")
         paint.inner_shadow(bay, 3, 10, white(0, 0.9))
-        sx, sy = self.SHELL
-        draw_cassette(sx, sy, self.shell, self.title, self.subtitle, self.p)
-        for cx, cy in self.hubs():          # the hubs' shadows on the tape; the hubs are layers on top
-            paint.with_shadow(paint.shadow(1, 3, white(0, 0.6)), lambda: paint.fill(paint.oval(cx, cy, HUB - 1), "#3a2a1e"))
 
     def drawGlass(self):
         """The window in the label, the smoked door in front, and a pull notch at the top."""
@@ -325,7 +344,7 @@ def tape_path(sx, sy, p):
     return path
 
 
-def draw_cassette(sx, sy, kind, title, subtitle, p):
+def draw_cassette(sx, sy, kind, title, subtitle, p, side=None):
     shell_r = NSMakeRect(sx, sy, 400, 252)
     shell = paint.rounded(shell_r, 12)
     clear = SHELLS.get(kind, SHELLS["black"]) is None
@@ -368,7 +387,7 @@ def draw_cassette(sx, sy, kind, title, subtitle, p):
     for x, y in SCREWS:
         draw_screw(sx + x, sy + y, 5)
     draw_head_ramp(sx + 72, sy + 196, clear)
-    draw_label(sx, sy, title, subtitle)
+    draw_label(sx, sy, title, subtitle, side or ("A", 1, 60))
 
 
 def draw_screw(cx, cy, r):
@@ -435,7 +454,7 @@ def draw_mechanism(sx, sy, engage, clear):
         paint.clipped(paint.oval(sx + CAPSTAN[0], sy + 229, 6), parts)
 
 
-def draw_label(sx, sy, title, subtitle):
+def draw_label(sx, sy, title, subtitle, side):
     """The label: an index area with the handwritten title, an orange band round the window with the
     side letter, and a printed strip with the tape's brand and type. The window is a hole in it."""
     x, y = sx + LABEL.origin.x, sy + LABEL.origin.y
@@ -458,10 +477,13 @@ def draw_label(sx, sy, title, subtitle):
         paint.text(subtitle, NSMakeRect(x + 16, y + 48.5 - small.ascender(), 326, 26), small, INK)
         paint.fill(NSMakeRect(x, y + 56, 356, 86), "#ee7a36", "#df5f22")
         paint.fill(NSMakeRect(x, y + 56, 356, 1), white(0, 0.12))
-        paint.text(u"A", NSMakeRect(x + 15, y + 78, 34, 30), paint.font("Helvetica-Bold", 26, True), white(1, 0.95))
+        letter, tape, minutes = side
+        paint.text(letter, NSMakeRect(x + 15, y + 78, 34, 30), paint.font("Helvetica-Bold", 26, True), white(1, 0.95))
         paint.text(u"SIDE", NSMakeRect(x + 14, y + 108, 40, 9), tiny, white(1, 0.85), kern=1.2)
-        paint.text(u"60", NSMakeRect(x + 304, y + 80, 44, 24), paint.font("Helvetica-Bold", 22, True), white(1, 0.95),
-                   NSRightTextAlignment)
+        if tape > 1:
+            paint.text(u"TAPE %d" % tape, NSMakeRect(x + 14, y + 66, 44, 9), tiny, white(1, 0.85), kern=1.2)
+        paint.text(u"%d" % minutes, NSMakeRect(x + 296, y + 80, 52, 24), paint.font("Helvetica-Bold", 22, True),
+                   white(1, 0.95), NSRightTextAlignment)
         paint.text(u"MIN", NSMakeRect(x + 304, y + 106, 44, 9), tiny, white(1, 0.85), NSRightTextAlignment, kern=1.2)
         paint.text(u"KASSETT", NSMakeRect(x + 14, y + 144, 140, 14), paint.font("Helvetica-Bold", 11, True), "#1f1f1f", kern=1.5)
         paint.text(u"TYPE I (NORMAL) POSITION", NSMakeRect(x + 14, y + 156, 160, 9), tiny, "#555555", kern=0.6)
@@ -471,8 +493,8 @@ def draw_label(sx, sy, title, subtitle):
             (arrow.lineToPoint_ if i else arrow.moveToPoint_)(NSMakePoint(ax + px, ay + py))
         arrow.closePath()
         paint.fill(arrow, "#df5f22")
-        paint.text(u"C60", NSMakeRect(x + 280, y + 145, 64, 18), paint.font("Helvetica-Bold", 14, True), "#1f1f1f",
-                   NSRightTextAlignment)
+        paint.text(u"C%d" % minutes, NSMakeRect(x + 280, y + 145, 64, 18), paint.font("Helvetica-Bold", 14, True),
+                   "#1f1f1f", NSRightTextAlignment)
     paint.clipped(shape, body)
     paint.inner_shadow(win, 1, 2, white(0, 0.6))      # the label's thickness at the window's edge
     paint.stroke(win, white(0, 0.3), 1)
@@ -637,6 +659,64 @@ class ReelView(NSView):
             hub.setBeginTime_(now)
             hub.setSpeed_(turns)
             self.speeds[i] = turns
+
+
+class CassetteFlip(NSView):
+    """Turns the cassette over in its bay when the album moves from side A to side B: the old side
+    on the front of a card, the new one on the back, rotated by Core Animation on the GPU."""
+    DURATION = 0.7
+
+    def initWithFrame_(self, frame):
+        self = super(CassetteFlip, self).initWithFrame_(frame)
+        if self:
+            self.setLayer_(CALayer.layer())
+            self.setWantsLayer_(True)
+            self.setHidden_(True)
+        return self
+
+    def hitTest_(self, point):
+        return None
+
+    def flip(self, old, new, bay):
+        b = self.bounds()
+        size = ((0, 0), (b.size.width, b.size.height))
+        CATransaction.begin()
+        CATransaction.setDisableActions_(True)
+        root = self.layer()
+        root.setSublayers_([])
+        root.setGeometryFlipped_(True)
+        root.setContents_(bay)
+        perspective = CATransform3DMakeRotation(0, 0, 1, 0)
+        perspective.m34 = -1.0 / 900
+        root.setSublayerTransform_(perspective)
+        card = CATransformLayer.layer()
+        card.setFrame_(size)
+        for img, turned in ((old, False), (new, True)):
+            face = CALayer.layer()
+            face.setFrame_(size)
+            face.setContents_(img)
+            face.setDoubleSided_(False)
+            if turned:
+                face.setTransform_(CATransform3DMakeRotation(math.pi, 0, 1, 0))
+            card.addSublayer_(face)
+        root.addSublayer_(card)
+        CATransaction.commit()
+        turn = CABasicAnimation.animationWithKeyPath_("transform.rotation.y")
+        turn.setFromValue_(0.0)
+        turn.setToValue_(math.pi)
+        turn.setDuration_(self.DURATION)
+        turn.setTimingFunction_(CAMediaTimingFunction.functionWithName_(kCAMediaTimingFunctionEaseInEaseOut))
+        turn.setRemovedOnCompletion_(False)
+        turn.setFillMode_("forwards")
+        card.addAnimation_forKey_(turn, "turn")
+        self.setHidden_(False)
+        NSObject.cancelPreviousPerformRequestsWithTarget_selector_object_(self, "done:", None)
+        self.performSelector_withObject_afterDelay_("done:", None, self.DURATION + 0.05)
+
+    def done_(self, _):
+        self.setHidden_(True)
+        self.layer().setSublayers_([])
+        self.layer().setContents_(None)
 
 
 # ---- piano keys --------------------------------------------------------------------------------------
@@ -1089,6 +1169,9 @@ class Deck(NSObject):
         self.view = deck
         self.cassette = CassetteView.alloc().initWithFrame_(NSMakeRect(18, 56, 452, 286))
         deck.addSubview_(self.cassette)
+        self.flipper = CassetteFlip.alloc().initWithFrame_(NSMakeRect(18, 56, 452, 286))
+        deck.addSubview_(self.flipper)
+        self.side_album = None
         self.lcd = LCDView.alloc().initWithFrame_(NSMakeRect(18, 354, 452, 51))
         self.lcd.onSeek = self.app.seekToFraction
         self.lcd.onLink = self.app.followLink
@@ -1175,8 +1258,27 @@ class Deck(NSObject):
                 k.setEnabled_(on)
         self.ensureTimer()
 
-    def setPosition(self, progress_ms, duration_ms, jumped):
-        p = float(progress_ms) / duration_ms if duration_ms else 0.0
+    def setSide(self, side, album_id):
+        """Show side A or B (with its tape and length). Moving to the other side of the same album
+        turns the cassette over; a different album is simply a different tape."""
+        if side == self.cassette.side:
+            self.side_album = album_id
+            return
+        flip = (self.cassette.side is not None and album_id is not None and album_id == self.side_album
+                and self.window.isVisible() and not self.window.isMiniaturized())
+        old = self.cassette.tapeImage() if flip else None
+        self.cassette.side, self.side_album = side, album_id
+        self.cassette.setNeedsDisplay_(True)
+        if flip:
+            self.flipper.flip(old, self.cassette.tapeImage(), self.cassette.bayImage())
+
+    def setPosition(self, progress_ms, duration_ms, jumped, side_offset=None, side_ms=None):
+        """The counter and LCD follow the song; the tape packs follow the whole side when the album's
+        sides are known (side_offset: where the song starts on its side), else the song."""
+        if side_ms:
+            p = min(1.0, float(side_offset + progress_ms) / side_ms)
+        else:
+            p = float(progress_ms) / duration_ms if duration_ms else 0.0
         if jumped and abs(p - self.cassette.p) > 0.01 and self.window.isVisible():
             self.whirr = (self.cassette.p, p, time.time())
             self.cassette.coarse = True

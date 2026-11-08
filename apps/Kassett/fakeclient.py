@@ -88,7 +88,8 @@ class FakeSpotify(object):
         for x in ALBUMS + [(n, u"First Aid Kit", y) for n, y in FAKA]:
             if "al" + slug(x[0]) == album_id:
                 a = dict(album(*x))
-        a["tracks"] = {"items": [dict(track(n, a["artists"][0]["name"], s), album=None) for n, s in ROAR], "total": 10}
+        a["tracks"] = {"items": [dict(track(n, a["artists"][0]["name"], s), album=None, track_number=i + 1, disc_number=1)
+                                 for i, (n, s) in enumerate(ROAR)], "total": 10}
         return a
 
     def album_tracks(self, album_id, offset=0):

@@ -19,6 +19,7 @@ import art
 import deck
 import glyphs
 import ownapp
+import sides
 import upnext
 
 APP_NAME = "Kassett"
@@ -36,9 +37,9 @@ SUPPORT = os.path.expanduser("~/Library/Caches/Kassett")
 FAKE_STATE = {
     "is_playing": True, "progress_ms": 103000, "shuffle_state": False,
     "device": {"id": "fake", "name": u"Living Room", "type": "Speaker", "volume_percent": 64},
-    "context": {"type": "album", "uri": "spotify:album:fake"},
-    "item": {"id": "fake1", "uri": "spotify:track:fake1", "type": "track", "name": u"The Lion’s Roar",
-             "duration_ms": 245000, "artists": [{"id": "fakeartist", "name": u"First Aid Kit"}],
+    "context": {"type": "album", "uri": "spotify:album:fakealbum"},
+    "item": {"id": "fake1", "uri": "spotify:track:fake1", "type": "track", "name": u"I Found a Way",
+             "duration_ms": 221000, "track_number": 7, "disc_number": 1, "artists": [{"id": "fakeartist", "name": u"First Aid Kit"}],
              "album": {"id": "fakealbum", "name": u"The Lion’s Roar", "release_date": "2012-01-13", "images": []}},
 }
 
@@ -59,6 +60,19 @@ def describe(item):
             "artist": u", ".join(a.get("name") or u"" for a in item.get("artists") or []),
             "album": album.get("name") or u"", "year": (album.get("release_date") or u"")[:4],
             "images": album.get("images")}
+
+
+def track_index(tracks, item):
+    """Where the playing song is in its album's track list (by disc and number, else by URI or name)."""
+    number, disc = item.get("track_number"), item.get("disc_number") or 1
+    if number:
+        for i, t in enumerate(tracks):
+            if (t["disc"], t["number"]) == (disc, number):
+                return i
+    for i, t in enumerate(tracks):
+        if t["uri"] == item.get("uri") or t["name"] == item.get("name"):
+            return i
+    return None
 
 
 def subtitle(info):
@@ -88,6 +102,7 @@ class AppDelegate(NSObject):
         self.flash_until, self.flash_text = 0, None
         self.volume_sent = 0
         self.library = None
+        self.album_sides, self.sides_loading, self.side_info = {}, set(), None
         self.controllable = True   # False while the playing device only obeys Spotify's own apps
         self.fake = self.defaults.boolForKey_("DebugFakeState")
         if self.defaults.boolForKey_("DebugPerf"):
@@ -216,6 +231,8 @@ class AppDelegate(NSObject):
 
     def showNothing(self):
         self.item_id = None
+        self.side_info = None
+        self.deck.setSide(("A", 1, 60), None)
         self.showLinks(None)
         self.deck.setTape(u"Nothing playing", u"Pick a song in the library, or start Spotify on a device")
         self.deck.setArt(None, u"", True)
@@ -230,6 +247,64 @@ class AppDelegate(NSObject):
             self.deck.setStatus(u"Spotify isn’t playing on any device right now")
         if self.library:
             self.library.showState(self.state, 0)
+
+    # ---- the album's sides -------------------------------------------------------------------------
+    def updateSide(self, item):
+        """When an album plays, work out which side the song is on and where on that side it starts,
+        so the label shows A or B and the tape packs follow the whole side."""
+        info, album_id = None, None
+        album_id_now = ((item or {}).get("album") or {}).get("id")
+        context = (self.state or {}).get("context") or {}
+        if album_id_now and context.get("type") == "album" and (context.get("uri") or u"").split(u":")[-1] == album_id_now:
+            album_id = album_id_now
+            data = self.album_sides.get(album_id)
+            if data is None:
+                self.loadSides(album_id)
+            else:
+                tracks, album_sides = data
+                index = track_index(tracks, item)
+                if index is not None:
+                    side, offset = sides.locate(album_sides, tracks, index)
+                    if side:
+                        info = (side, offset)
+        self.side_info = info
+        if info:
+            self.deck.setSide((info[0]["letter"], info[0]["tape"], info[0]["minutes"]), album_id)
+        else:
+            self.deck.setSide(("A", 1, 60), album_id)
+
+    def loadSides(self, album_id):
+        if album_id in self.sides_loading:
+            return
+        self.sides_loading.add(album_id)
+        client = self.libraryClient()
+
+        def work():
+            album = client.album(album_id) or {}
+            paging = album.get("tracks") or {}
+            found = list(spotify.items_of(paging))
+            while paging.get("next") and len(found) < 500:
+                paging = client.album_tracks(album_id, len(found)) or {}
+                page = spotify.items_of(paging)
+                if not page:
+                    break
+                found += page
+            tracks = [{"disc": t.get("disc_number") or 1, "number": t.get("track_number"), "uri": t.get("uri"),
+                       "name": t.get("name"), "duration": t.get("duration_ms") or 0} for t in found]
+            return tracks, sides.split(tracks)
+
+        def done(result, error):
+            self.sides_loading.discard(album_id)
+            if error or not result:
+                return
+            self.album_sides[album_id] = result
+            while len(self.album_sides) > 30:
+                self.album_sides.pop(next(iter(self.album_sides)))
+            item = self.item()
+            if item and (item.get("album") or {}).get("id") == album_id:
+                self.updateSide(item)
+                self.showPosition(self.estimatedProgress(), True)
+        cocoa.in_background(work, done)
 
     def showLinks(self, links):
         self.deck.setLinks(links)
@@ -372,6 +447,7 @@ class AppDelegate(NSObject):
         dev = self.state.get("device") or {}
         self.controllable = not dev.get("is_restricted")
         self.deck.setTape(info["title"], subtitle(info))
+        self.updateSide(item)
         self.showLinks(deck.song_links(item))
         self.deck.setPlaying(self.isPlaying(), True, self.controllable)
         self.showPosition(progress, jumped)
@@ -391,7 +467,11 @@ class AppDelegate(NSObject):
     def showPosition(self, progress, jumped):
         item = self.item() or {}
         duration = item.get("duration_ms") or 0
-        self.deck.setPosition(progress, duration, jumped)
+        if self.side_info:
+            side, offset = self.side_info
+            self.deck.setPosition(progress, duration, jumped, offset, side["duration"])
+        else:
+            self.deck.setPosition(progress, duration, jumped)
         info = describe(item) if item else {"title": u"", "artist": u""}
         self.mini.show(info["title"], info["artist"], float(progress) / duration if duration else 0,
                        self.isPlaying(), bool(item))
@@ -511,6 +591,10 @@ class AppDelegate(NSObject):
         if self.state and self.item():
             self.state["progress_ms"], self.fetched_at = 0, time.time()
             self.showPosition(0, True)
+            if self.side_info:        # wind the tape to where the next song (or this one) starts
+                side, offset = self.side_info
+                duration = self.item().get("duration_ms") or 0
+                self.deck.setPosition(0, duration, True, offset if back else offset + duration, side["duration"])
         self.send(work, 0.9)
 
     def next_(self, sender):

@@ -20,6 +20,7 @@ from lionkit import cocoa, spotify
 import art
 import glyphs
 import paint
+import sides
 from paint import hexc, white
 import deck
 from deck import INK
@@ -40,6 +41,7 @@ def slim_track(t, album=None):
             "artists": [(a.get("id"), a.get("name") or u"") for a in t.get("artists") or []],
             "album": album.get("name") or u"", "album_id": album.get("id"),
             "image": art.small(album.get("images")), "big": art.large(album.get("images")), "duration": t.get("duration_ms") or 0,
+            "disc": t.get("disc_number") or 1, "number": t.get("track_number"),
             "playable": t.get("is_playable", True) is not False and not t.get("is_local")}
 
 
@@ -74,7 +76,23 @@ def slim_playlist(p, me_id):
             "description": clean(p.get("description"))}
 
 
+def side_rows(rows):
+    """An album's songs with a header row before each side, like the track listing on a J-card."""
+    album_sides = sides.split(rows)
+    if len(album_sides) < 2:
+        return rows
+    multi_disc = len(set(r["disc"] for r in rows)) > 1
+    out = []
+    for side in album_sides:
+        title = u"%s \u00b7 %s" % (sides.heading(side, multi_disc), paint.total_time(side["duration"]))
+        out.append({"header": True, "title": title.upper(), "uri": None, "playable": False, "duration": 0,
+                    "name": u"", "artists": [], "album": u""})
+        out += [rows[i] for i in side["tracks"]]
+    return out
+
+
 def songs_and_time(rows, total):
+    rows = [r for r in rows if not r.get("header")]
     n = paint.plural(total, u"song")
     if total and len(rows) >= total:
         return u"%s, %s" % (n, paint.total_time(sum(r["duration"] for r in rows)))
@@ -496,6 +514,8 @@ class TrackTable(NSTableView):
             return None
         if not self.isRowSelected_(row):
             self.selectRowIndexes_byExtendingSelection_(NSIndexSet.indexSetWithIndex_(row), False)
+        if self.owner.rows[row].get("header"):
+            return None
         return self.owner.trackMenu(self.owner.rows[row], row)
 
     def keyDown_(self, event):
@@ -648,12 +668,39 @@ class ListPage(NSObject):
     def numberOfRowsInTableView_(self, t):
         return len(self.rows)
 
+    def tracks(self):
+        return [r for r in self.rows if not r.get("header")]
+
+    def tableView_isGroupRow_(self, t, row):
+        return bool(self.rows[row].get("header"))
+
+    def tableView_shouldSelectRow_(self, t, row):
+        return not self.rows[row].get("header")
+
+    def tableView_heightOfRow_(self, t, row):
+        return 22 if self.rows[row].get("header") else 18
+
+    def tableView_dataCellForTableColumn_row_(self, t, col, row):
+        if col is None:                     # AppKit asks for one wide cell for a group row
+            if not self.rows[row].get("header"):
+                return None
+            if getattr(self, "sideCell", None) is None:
+                self.sideCell = NSTextFieldCell.alloc().init()
+                self.sideCell.setFont_(paint.ui(10, True))
+                self.sideCell.setTextColor_(hexc("#5f5f5f"))
+            return self.sideCell
+        return col.dataCellForRow_(row)
+
     def tableView_objectValueForTableColumn_row_(self, t, col, row):
         if row >= len(self.rows) - 15:
             self.library.loadMore()
         r = self.rows[row]
+        if r.get("header"):
+            return r["title"] if col is None else u""
         key = col.identifier()
         if key == "n":
+            if self.kind == "album" and r.get("number"):
+                return unicode(r["number"])
             return unicode(row + 1)
         if key == "name":
             return r["name"]
@@ -665,6 +712,8 @@ class ListPage(NSObject):
 
     def tableView_willDisplayCell_forTableColumn_row_(self, t, cell, col, row):
         r = self.rows[row]
+        if r.get("header") or col is None:
+            return
         key = col.identifier()
         if key == "n":
             cell.playing = r["uri"] == self.library.playing_uri
@@ -678,20 +727,22 @@ class ListPage(NSObject):
     # actions
     def playRow_(self, sender):
         row = self.table.clickedRow() if sender is self.table and self.table.clickedRow() >= 0 else self.table.selectedRow()
-        if 0 <= row < len(self.rows):
-            self.library.playRows(self.kind, self.source, self.rows, row)
+        if 0 <= row < len(self.rows) and not self.rows[row].get("header"):
+            tracks = self.tracks()
+            self.library.playRows(self.kind, self.source, tracks, tracks.index(self.rows[row]))
 
     def playAll_(self, sender):
-        self.library.playRows(self.kind, self.source, self.rows, None, False)
+        self.library.playRows(self.kind, self.source, self.tracks(), None, False)
 
     def shuffleAll_(self, sender):
-        self.library.playRows(self.kind, self.source, self.rows, None, True)
+        self.library.playRows(self.kind, self.source, self.tracks(), None, True)
 
     def toggleSaved_(self, sender):
         self.library.toggleSaved(self.source, self.saveButton)
 
     def trackMenu(self, r, row):
-        return self.library.trackMenu(r, lambda: self.library.playRows(self.kind, self.source, self.rows, row),
+        tracks = self.tracks()
+        return self.library.trackMenu(r, lambda: self.library.playRows(self.kind, self.source, tracks, tracks.index(r)),
                                       self.kind == "liked")
 
     def refreshPlaying(self):
@@ -1304,7 +1355,7 @@ class Library(NSObject):
         self.showPage(self.list.view)
         self.window.makeFirstResponder_(self.list.table)
         uri, self.reveal_uri = getattr(self, "reveal_uri", None), None
-        rows = [i for i, r in enumerate(self.list.rows) if uri and r["uri"] == uri]
+        rows = [i for i, r in enumerate(self.list.rows) if uri and r.get("uri") == uri]
         if rows:       # opened from the playing song: pick it in the list
             self.list.table.selectRowIndexes_byExtendingSelection_(NSIndexSet.indexSetWithIndex_(rows[0]), False)
             self.list.table.scrollRowToVisible_(rows[0])
@@ -1383,16 +1434,20 @@ class Library(NSObject):
             info = slim_album(a)
             paging = a.get("tracks") or {}
             rows = [slim_track(t, a) for t in spotify.items_of(paging)]
+            while paging.get("next") and len(rows) < 500:     # every song, so the sides can be worked out
+                paging = client.album_tracks(album_id, len(rows)) or {}
+                page = [slim_track(t, a) for t in spotify.items_of(paging)]
+                if not page:
+                    break
+                rows += page
             saved = client.library_contains([info["uri"]])
-            return info, rows, paging.get("total") or len(rows), bool(saved and saved[0])
+            return info, rows, len(rows), bool(saved and saved[0])
 
         def done(result):
             info, rows, total, saved = result
-            minutes = u", " + paint.total_time(sum(r["duration"] for r in rows)) if len(rows) >= total else u""
+            minutes = u", " + paint.total_time(sum(r["duration"] for r in rows))
             meta = u" · ".join(x for x in (info["artist"], info["year"], paint.plural(total, u"song") + minutes) if x)
-            self.openList("album", info, rows, total, (u"ALBUM", info["name"], meta, u""), saved, len(rows),
-                          lambda offset: client.album_tracks(album_id, offset), {"name": info["name"], "id": info["id"],
-                                                                               "images": info["images"]})
+            self.openList("album", info, side_rows(rows), total, (u"ALBUM", info["name"], meta, u""), saved)
         self.fetch(work, done)
 
     def toggleSaved(self, source, button):
