@@ -77,16 +77,42 @@ sorting, polish. First, **get the user's feedback on 0.3** and fix what they rep
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 
 ## WS-3 · Dashboard widgets
-**Status:** todo · **Branch:** `ws/widgets` · **Owns:** `widgets/`
+**Status:** review (Forecast is waiting on the user's look in Dashboard; Now Playing is parked) · **Branch:** `ws/widgets` · **Owns:** `widgets/`, `tools/widget_preview.py`
 
-Dashboard is disabled on the Mac; the user must re-enable it (`defaults write com.apple.dashboard
-mcx-disabled -bool false; killall Dock`; ask them).
 - **Weather** in the style of Apple's widget (big temperature, condition art, 6-day strip) using
   Open-Meteo (no key). Dashboard's WebKit can't do modern TLS, so fetch through
   `widget.system("~/Library/LionKit/bin/lk-curl ...")` with `AllowSystem` in Info.plist.
 - **Now Playing** mini widget for Spotify (reuse the refresh token from the keychain through a
   tiny Python helper; read-only plus play/pause/next).
 - Stretch: Hacker News top 10, a currency converter.
+
+Done (2026-11-08):
+- `widgets/Forecast.wdgt` 0.1 is Lion's Weather reimagined on Open-Meteo. It has a slate panel by
+  day and plum by night, canvas-drawn condition art (the moon shows its real phase), a six-day strip
+  that folds away on click, and a linen back with city search, °C/°F and Apple's info and Done
+  buttons. The last forecast is cached in the widget's prefs so Dashboard never opens to a blank.
+- `tools/widget_preview.py` renders a widget in Lion's WebKit off screen over SSH, with a stand-in
+  `widget` object, and saves PNGs of any state (`--eval`, `--shot`). Every state above was checked this way.
+- On the Mac, Dashboard is re-enabled (the user approved it) and Forecast is added to the layer
+  at (980, 560). Hong Kong is preset as the default place with `defaults write
+  widget-page.zepto.widget.forecast place '{...}'`. The old Dashboard prefs are backed up in
+  `~/Library/LionKitDev/com.apple.dashboard.plist.backup`.
+
+Next:
+- Get the user's screenshot of Forecast in Dashboard. Check the close-box position
+  (`CloseBoxInsetX/Y` 9/41), the flip, the fold animation and the window resizes, none of which the
+  preview can show. Ask whether Apple's broken Weather widget should come out of the layer.
+- **Now Playing** (not started): follow Kassett's mini player (`design/kassett/project/Mini.dc.html`),
+  with an aluminium bar, a small cassette whose reels turn while playing, the title in Marker Felt
+  and the artist in Noteworthy (both ship with Lion), and prev/play/next buttons. Clicking the cassette
+  opens Kassett. A `/usr/bin/python -S` helper in the bundle prints JSON for
+  `status|play|pause|next|previous`. It finds the client ID from `defaults read page.zepto.kassett
+  clientID` (or the keychain item's account), reads the refresh token from "LionKit Spotify" right
+  before refreshing, writes a rotated token back with `security -i add-generic-password -U`,
+  caches the access token in a second item ("LionKit Spotify Widget"), and serializes refreshes
+  with a `flock`. Tokens go through a 0600 header file, never argv. Spotify revokes a refresh token
+  once it's been exchanged, so this depends on WS-1 making `lionkit/spotify.py` re-read the keychain
+  before each refresh. That request was sent to the Kassett session on 2026-11-08.
 
 ## WS-4 · Murmur (Mastodon + Bluesky)
 **Status:** todo · **Branch:** `ws/murmur` · **Owns:** `apps/Murmur`, `lionkit/mastodon.py`, `lionkit/bluesky.py`, `lionkit/oauth.py` (new: a loopback OAuth helper modelled on `spotify.py`'s; don't edit `spotify.py`)
