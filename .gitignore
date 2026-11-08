@@ -8,3 +8,5 @@ LionKit.tgz
 
 # agent worktrees created by Claude sessions
 .claude/
+# Release downloads built by tools/package.sh
+dist/

@@ -13,7 +13,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 
 | Piece | Version | State |
 |---|---|---|
-| LionKit runtime: curl 8 + OpenSSL 3, dwebp, from MacPorts darwin_11 | — | works, 38 MB, untrimmed |
+| LionKit runtime: curl 8 + OpenSSL 3, dwebp, from MacPorts darwin_11 | — | works, trimmed to 14.5 MB |
 | `lionkit` library: http, keychain, ghost, spotify, markdown, html2md, cocoa, icons | — | works |
 | Planchette (Ghost blog editor) | 0.3 | in user testing |
 | Kassett (Spotify Connect remote) | 0.2 | in user testing; cassette redesign mocked up |
@@ -147,14 +147,19 @@ floating window. Accounts: any Mastodon instance (OAuth with a 127.0.0.1 redirec
 **Done when:** the user can read, post (with an image), reply, boost/repost and like on both networks.
 
 ## WS-5 · LionKit platform
-**Status:** todo · **Branch:** `ws/lionkit` · **Owns:** `lionkit/http.py`, `lionkit/cocoa.py`, `lionkit/icons.py`, `tools/build_lionkit.py`, `tools/build_app.py`
+**Status:** in progress (runtime done) · **Branch:** `ws/distribution` (runtime part, with WS-6) · **Owns:** `lionkit/http.py`, `lionkit/cocoa.py`, `lionkit/icons.py`, `tools/build_lionkit.py`, `tools/build_app.py`
 
-- **Trim the runtime** to curl's and dwebp's real dependency closure. Lion has no `otool` (it comes
-  with Xcode): read the Mach-O load commands with `macholib` (bundled with Lion's Python in
-  `Extras/lib/python`) or with `llvm-objdump --macho --dylibs-used` on Linux. Copy symlinks as
-  symlinks. Target ≤ 15 MB. Consider `libavif` for AVIF images.
-- **Runtime lookup**: `lionkit.http` finds the runtime in the app bundle (`Resources/LionKit`), then
-  `~/Library/LionKit`. Same for `lk-dwebp`.
+- ~~Trim the runtime~~ **done**: 14.5 MB (was 38), 19 libraries stored once plus 5 symlinks. The load
+  commands are read on the Mac with Lion's macholib (this Linux box has no llvm-objdump), so
+  `build_lionkit.py` needs the Mac even with `--no-install`. Installed as the dev runtime too.
+  Still open: consider `libavif` for AVIF images.
+- ~~Runtime lookup~~ **done**: `lionkit.http` uses `Contents/Resources/runtime` in the bundle, then
+  `~/Library/LionKit`; `http.DWEBP` follows it (Planchette uses it now: a one-line change in WS-2's
+  file). Not `Resources/LionKit`: HFS+ is case-insensitive, so it would merge with `lionkit/`.
+- **Next (runtime)**: launched from a read-only place (the DMG), an app runs under the system
+  binary and its icon is Python's rocket (Kassett's art placeholder shows it). `cocoa.py` could set
+  `NSApp.setApplicationIconImage_` from `AppIcon.icns`. IDN hostnames need a UTF-8 locale for
+  curl; GUI apps may not have one (true before the trim too).
 - **Image pipeline**: one disk cache with size limits, WebP/AVIF → PNG/JPEG, thumbnails
   (`lionkit/images.py`, new file; apps adopt it later).
 
@@ -166,14 +171,24 @@ cells with badges, HUD helpers, LCD view, bottom-bar labels, textured toolbar fa
 copies moved out of the apps. Not before: it would collide with the app workstreams.
 
 ## WS-6 · Distribution & website
-**Status:** in progress (repo public, site live at https://xgzepto.github.io/lionkit/) · **Branch:** `ws/distribution` · **Owns:** `site/`, `docs/distribution.md`, `tools/package.sh`, `.github/`
+**Status:** in progress (repo public, site live at https://xgzepto.github.io/lionkit/, packaging works) · **Branch:** `ws/distribution` · **Owns:** `site/`, `docs/distribution.md`, `tools/package.sh`, `.github/`
 
-Plan: `docs/distribution.md`. Remaining:
-- `tools/package.sh`: release build (no bundled Python binary, first-run copy, embedded runtime),
-  DMG with background + Applications alias, zip, checksums into `dist/`.
+Plan: `docs/distribution.md`.
+- ~~`tools/package.sh`~~ **done**: `tools/package.sh apps/Kassett apps/Planchette` builds
+  `dist/<App>-<version>.dmg` (~6.3 MB) and `.zip` (~6.1 MB) plus `SHA256SUMS`. `build_app.py
+  --release` leaves Apple's binary out (the launcher copies it on first run and falls back to the
+  system one when the bundle is read-only). `tools/make_dmg.py` writes the window layout itself, so
+  Finder never opens a window. Tested from a temp folder on the Mac (zip and DMG copies, a fresh
+  sandboxed home): both apps launch in the background, name themselves correctly, log nothing and
+  quit cleanly; the read-only fallback runs as "Python".
+- **Not verified yet**: how Finder actually draws the DMG window (the `.DS_Store` parses and the
+  background alias resolves on the compressed image, but nobody has looked at the window), the
+  Gatekeeper right-click → Open path on a quarantined download, and the screenshot for the Read Me.
+  The Read Me also doesn't mention Spotify's 25-account limit yet (open question below).
+Remaining:
 - `updates.json` on the site + an update check in each app (via WS-5's http).
 - Site polish: real screenshots from the Mac (`tools/shot.py`, never with personal photos in view),
-  download buttons wired to Releases, a GitHub link once the repo exists. `site/index.html`'s deck is
+  download buttons wired to Releases. `site/index.html`'s deck is
   generated from `design/kassett/project/Main.dc.html`; regenerate it when the design changes.
 - Publishing: `.github/workflows/pages.yml` deploys `site/` once the repo is on GitHub with Pages
   set to "GitHub Actions".

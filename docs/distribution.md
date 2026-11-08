@@ -16,9 +16,9 @@ Status: **design**, owned by workstream WS-6 in `ROADMAP.md`.
 - **Apple's Python binary isn't ours to redistribute.** Each bundle currently contains a copy of
   `Python.app/Contents/MacOS/Python` so the menu bar shows the app's name. Release builds leave it
   out; the launcher copies it from the system on first run (see below).
-- **The runtime is big.** curl + OpenSSL 3 + friends is ~38 MB as assembled today, but half of that
-  is duplicated symlink targets and libraries curl doesn't load. The real dependency closure
-  should be ~12 MB.
+- **The runtime is ~14.5 MB.** `tools/build_lionkit.py` keeps only the dependency closure of curl
+  and dwebp (19 libraries, each stored once, with symlinks for the other install names). It was
+  38 MB before the trim.
 
 ## What we ship
 
@@ -33,12 +33,15 @@ Kassett.app/Contents/
   Info.plist
   MacOS/Kassett          # launcher script (below)
   Resources/main.py, lionkit/, AppIcon.icns
-  Resources/LionKit/           # the trimmed runtime: bin/curl, bin/dwebp, lib/*.dylib, CA bundle
+  Resources/runtime/           # the trimmed runtime: bin/curl, bin/dwebp, lib/*.dylib, CA bundle
 ```
+
+The runtime folder is called `runtime`, not `LionKit`, because HFS+ is case-insensitive:
+`Resources/LionKit` and the `Resources/lionkit` package would be the same folder.
 
 **Self-contained runtime per app** (not a shared install): each app works on its own, nothing to
 install first, nothing to uninstall but the app. `lionkit.http` looks for the runtime in the
-bundle first, then `~/Library/LionKit` (dev builds).
+bundle first, then `~/Library/LionKit` (dev builds). `lionkit.http.DWEBP` follows the same order.
 
 **First-run launcher**:
 
@@ -60,10 +63,15 @@ tools/package.sh apps/Kassett      # → dist/Kassett-0.3.dmg and .zip
 
 1. Build the bundle on the Mac into a temp dir with `build_app.py --release` (no Python binary,
    embedded trimmed runtime, version from `app.json`).
-2. Make the DMG with `hdiutil create -format UDZO` from a staging folder (app + /Applications
-   alias + background); lay out the Finder window with AppleScript in the GUI session.
-3. `ditto -c -k --keepParent` for the zip (keeps the bundle intact).
-4. Copy both back to `dist/` on Linux; print SHA-256 sums.
+2. `tools/make_dmg.py` stages the app, a symlink to /Applications, `Read Me First.rtf`, a
+   background drawn with AppKit and the app icon as the volume icon, then builds the image with
+   `hdiutil` (UDRW, then UDZO). It writes the window layout (`.DS_Store`) itself and makes the
+   background's alias with the Alias Manager while the rw image is mounted hidden, so Finder
+   never opens a window on the Mac. (Laying it out with AppleScript would put a Finder window
+   and a disk icon in front of whoever is using the Mac.)
+3. `ditto -c -k --keepParent` for the zip (keeps the bundle and its symlinks intact).
+4. Copy both back to `dist/` on Linux, check them against the Mac's SHA-256 sums, and write
+   `dist/SHA256SUMS`.
 5. Publish to **GitHub Releases** with `gh release create kassett-v0.3 dist/...`
    (tag per app: `<app-id>-v<version>`). Only with the user's go-ahead.
 
