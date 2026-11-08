@@ -213,7 +213,10 @@ class Spotify(object):
                 msg, reason = err.get("message"), err.get("reason")
             except Exception:
                 pass
-            if r.status == 403 and msg and "regist" in msg.lower():
+            if r.status == 403 and msg and "restricted device" in msg.lower():
+                # Some Connect devices (many AV receivers, TVs and speaker groups) only obey Spotify's own apps.
+                reason, msg = "RESTRICTED", "Only the Spotify app can control this device."
+            elif r.status == 403 and msg and "regist" in msg.lower():
                 # A Development Mode app only works for accounts its owner added in the dashboard.
                 reason, msg = "NOT_ALLOWLISTED", "Spotify hasn't added this account to the app's list of users."
             elif r.status == 429:

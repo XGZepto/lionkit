@@ -69,6 +69,13 @@ type. The Mac's screen was locked for most of this session, so I added a hidden 
 makes Kassett draw its own windows into PNGs. `DebugFakeState` shows a fake song and the sample library, and
 `DebugOpenView` opens `mini`, `upnext`, `ownapp`, `ownapp-guide` or `library:<view>` at launch.
 
+**Controls:** The user reported that no controls worked. A hidden probe (`DebugProbe`) showed the cause. They
+were playing on a speaker group ("Dining Room + 2"), which Spotify marks `is_restricted`. Spotify answers
+every Web API command for a restricted device with 403 "Restricted device" and leaves it out of
+`/me/player/devices`. Kassett can't change that. It now dims the keys, knob and progress bar, says in the
+bottom bar that only the Spotify app can control the device, and lists the device in the AirPlay menu with
+"Spotify app only". Command errors now go to the log.
+
 **Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
 the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
 cassette app icon in `icon.py` yet. I also couldn't test the not-allowlisted sheet with a real refused

@@ -870,12 +870,13 @@ class Deck(NSObject):
         x = 28 if glyph else 10
         self.status.setFrame_(NSMakeRect(x, 6, DECK_W - 100 - x, 17))
 
-    def setPlaying(self, playing, has_track):
-        self.playing = playing
+    def setPlaying(self, playing, has_track, controllable=True):
+        """controllable is False when Spotify won't take commands for the device that's playing."""
+        self.playing, self.controllable = playing, controllable
         self.keys[u"PLAY"].cell().latched = playing
         self.keys[u"PAUSE"].cell().latched = has_track and not playing
         for k in self.keys.values():
-            k.setEnabled_(has_track or k is self.keys[u"PLAY"])
+            k.setEnabled_(controllable and (has_track or k is self.keys[u"PLAY"]))
             k.setNeedsDisplay_(True)
         self.ensureTimer()
 
@@ -887,11 +888,13 @@ class Deck(NSObject):
             self.cassette.setProgress(p)
         self.p_target = p
         self.counter.setTime(progress_ms, duration_ms - progress_ms if duration_ms else None)
-        self.progress.setValues(p, paint.fmt(progress_ms), paint.fmt(duration_ms), bool(duration_ms))
+        self.progress.setValues(p, paint.fmt(progress_ms), paint.fmt(duration_ms),
+                                bool(duration_ms) and getattr(self, "controllable", True))
         self.ensureTimer()
 
     def setVolume(self, volume, enabled):
-        self.knob.setVolume(volume if volume is not None else 50, enabled and volume is not None)
+        self.knob.setVolume(volume if volume is not None else 50,
+                            enabled and volume is not None and getattr(self, "controllable", True))
 
     # ---- animation ----------------------------------------------------------------------------------
     def animating(self):
@@ -1082,8 +1085,10 @@ class Mini(NSObject):
         self.playing = playing
         self.playButton.cell().glyph = "pause" if playing else "play"
         self.playButton.setNeedsDisplay_(True)
+        controllable = getattr(self.app, "controllable", True)
         for b in (self.prevButton, self.nextButton):
-            b.setEnabled_(has_track)
+            b.setEnabled_(has_track and controllable)
+        self.playButton.setEnabled_(controllable)
         if playing and self.timer is None and self.window.isVisible():
             self.timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(1 / FPS, self, "frame:", None, True)
             NSRunLoop.currentRunLoop().addTimer_forMode_(self.timer, NSRunLoopCommonModes)

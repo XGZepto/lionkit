@@ -43,6 +43,11 @@ FAKE_STATE = {
 }
 
 
+def log(message):
+    """A line in ~/Library/Logs/Kassett.log (stderr isn't buffered, so it shows up right away)."""
+    sys.stderr.write((u"%s\n" % message).encode("utf-8"))
+
+
 def describe(item):
     """Title, artist line, album, year and artwork of a track or podcast episode."""
     if item.get("type") == "episode":
@@ -83,6 +88,7 @@ class AppDelegate(NSObject):
         self.flash_until, self.flash_text = 0, None
         self.volume_sent = 0
         self.library = None
+        self.controllable = True   # False while the playing device only obeys Spotify's own apps
         self.fake = self.defaults.boolForKey_("DebugFakeState")
         art.shared()
         self.buildMenus()
@@ -100,6 +106,8 @@ class AppDelegate(NSObject):
         self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(1.0, self, "tick:", None, True)
         self.tick_(None)
         self.performSelector_withObject_afterDelay_("debugOpen:", None, 1.5)
+        if self.defaults.boolForKey_("DebugProbe"):
+            self.performSelector_withObject_afterDelay_("debugProbe:", None, 4)
         if self.defaults.stringForKey_("DebugSnapshot"):
             self.performSelector_withObject_afterDelay_("debugSnapshot:", None,
                                                         self.defaults.floatForKey_("DebugSnapshotDelay") or 10)
@@ -272,10 +280,11 @@ class AppDelegate(NSObject):
         changed = item.get("id") != prev_id
         jumped = changed or abs(progress - prev_progress) > 2500
         self.item_id = item.get("id")
-        self.deck.setTape(info["title"], subtitle(info))
-        self.deck.setPlaying(self.isPlaying(), True)
-        self.showPosition(progress, jumped)
         dev = self.state.get("device") or {}
+        self.controllable = not dev.get("is_restricted")
+        self.deck.setTape(info["title"], subtitle(info))
+        self.deck.setPlaying(self.isPlaying(), True, self.controllable)
+        self.showPosition(progress, jumped)
         self.deck.setVolume(dev.get("volume_percent"), dev.get("supports_volume", True))
         self.applyStatus()
         self.showArt(info)
@@ -306,7 +315,10 @@ class AppDelegate(NSObject):
             self.deck.setStatus(u"Not logged in to Spotify")
         elif dev:
             verb = u"Playing on" if self.isPlaying() else u"Paused on"
-            self.deck.setStatus(u"%s %s" % (verb, dev.get("name") or u"Spotify"), glyphs.device_glyph(dev.get("type")))
+            text = u"%s %s" % (verb, dev.get("name") or u"Spotify")
+            if dev.get("is_restricted"):
+                text += u". Only the Spotify app can control this device."
+            self.deck.setStatus(text, glyphs.device_glyph(dev.get("type")))
 
     def flash(self, text):
         self.flash_text, self.flash_until = u"⚠ " + text, time.time() + FLASH
@@ -363,6 +375,7 @@ class AppDelegate(NSObject):
 
         def done(_, error):
             if error:
+                log("command failed: %r (HTTP %s, %s)" % (error, getattr(error, "status", "?"), getattr(error, "reason", None)))
                 self.flash(unicode(error))
             self.performSelector_withObject_afterDelay_("pollNow:", None, poll_after)
         cocoa.in_background(work, done)
@@ -565,20 +578,24 @@ class AppDelegate(NSObject):
         head = menu.addItemWithTitle_action_keyEquivalent_(u"Play On", None, "")
         head.setEnabled_(False)
         para = NSMutableParagraphStyle.alloc().init()
-        para.setTabStops_([NSTextTab.alloc().initWithType_location_(NSRightTabStopType, 210)])
-        for d in self.devices:
+        para.setTabStops_([NSTextTab.alloc().initWithType_location_(NSRightTabStopType, 260)])
+        devices = list(self.devices)
+        active = (self.state or {}).get("device")
+        if active and active.get("id") not in [d.get("id") for d in devices]:
+            devices.insert(0, dict(active, is_active=True))   # Spotify leaves restricted devices out of the list
+        for d in devices:
             name = d.get("name") or u"Device"
             item = menu.addItemWithTitle_action_keyEquivalent_(name, "transferTo:", "")
             if d.get("is_restricted"):
                 item.setAttributedTitle_(NSAttributedString.alloc().initWithString_attributes_(
-                    name + u"\tbusy", {NSFontAttributeName: NSFont.menuFontOfSize_(14), NSParagraphStyleAttributeName: para}))
+                    name + u"\tSpotify app only", {NSFontAttributeName: NSFont.menuFontOfSize_(14), NSParagraphStyleAttributeName: para}))
             item.setTarget_(self)
             item.setRepresentedObject_(d.get("id"))
             item.setState_(NSOnState if d.get("is_active") else NSOffState)
             item.setImage_(glyphs.image(glyphs.device_glyph(d.get("type")), 16))
             item.setEnabled_(bool(d.get("id")) and not d.get("is_restricted"))
             item.setIndentationLevel_(0)
-        if not self.devices:
+        if not devices:
             none = menu.addItemWithTitle_action_keyEquivalent_(u"No devices found", None, "")
             none.setEnabled_(False)
         menu.addItem_(NSMenuItem.separatorItem())
@@ -787,6 +804,30 @@ class AppDelegate(NSObject):
                 self.library.debugOpen(view.split(":", 1)[1])
 
 
+    def debugProbe_(self, _):
+        """Send Spotify the volume it already has and log the raw answer (no audible change)."""
+        from lionkit import http
+        client = self.client
+
+        def work():
+            state = client.now_playing() or {}
+            vol = (state.get("device") or {}).get("volume_percent")
+            client._ensure_token()
+            out = ["device %s volume %s playing %s" % ((state.get("device") or {}).get("type"), vol, state.get("is_playing"))]
+            if vol is not None:
+                r = http.request("PUT", spotify.API + "/me/player/volume?volume_percent=%d" % vol,
+                                 headers={"Authorization": "Bearer " + client.access_token}, timeout=15)
+                out.append("PUT volume without body -> HTTP %s %r" % (r.status, (r.body or "")[:300]))
+                r = http.request("PUT", spotify.API + "/me/player/volume?volume_percent=%d" % vol, body="",
+                                 headers={"Authorization": "Bearer " + client.access_token}, timeout=15)
+                out.append("PUT volume with empty body -> HTTP %s %r" % (r.status, (r.body or "")[:300]))
+            for d in client.devices():
+                out.append("device type=%s active=%s restricted=%s volume=%s" % (
+                    d.get("type"), d.get("is_active"), d.get("is_restricted"), d.get("supports_volume")))
+            out.append("active device restricted: %s" % (state.get("device") or {}).get("is_restricted"))
+            return "\n".join(out)
+        cocoa.in_background(work, lambda result, error: log("probe: %s %s" % (result, error)))
+
     def debugSnapshot_(self, _):
         """`defaults write page.zepto.kassett DebugSnapshot /tmp/kassett` makes Kassett draw its visible
         windows into PNGs (/tmp/kassett-<window>.png). This works while the screen is locked."""
@@ -803,7 +844,7 @@ class AppDelegate(NSObject):
             view.cacheDisplayInRect_toBitmapImageRep_(view.bounds(), rep)
             rep.representationUsingType_properties_(NSPNGFileType, None).writeToFile_atomically_(
                 "%s-%s.png" % (prefix, name), True)
-            print("snapshot %s-%s.png" % (prefix, name))
+            log("snapshot %s-%s.png" % (prefix, name))
 
 
 if __name__ == "__main__":
