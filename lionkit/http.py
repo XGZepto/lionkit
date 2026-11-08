@@ -5,9 +5,14 @@ import shutil
 import subprocess
 import tempfile
 
-LIONKIT = os.path.expanduser("~/Library/LionKit")
+# Release builds carry the runtime in the app bundle (Contents/Resources/runtime, beside this
+# package in Resources/lionkit); dev builds use the shared copy in ~/Library/LionKit.
+BUNDLED = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runtime")
+SHARED = os.path.expanduser("~/Library/LionKit")
+LIONKIT = BUNDLED if os.path.exists(os.path.join(BUNDLED, "bin", "curl")) else SHARED
 CURL = os.path.join(LIONKIT, "bin", "curl")
 CA_BUNDLE = os.path.join(LIONKIT, "share", "curl-ca-bundle.crt")
+DWEBP = os.path.join(LIONKIT, "bin", "lk-dwebp")  # WebP -> PNG: lk-dwebp in.webp -o out.png
 _ENV = dict(os.environ, DYLD_LIBRARY_PATH=os.path.join(LIONKIT, "lib"))
 
 
