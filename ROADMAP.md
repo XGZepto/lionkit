@@ -118,7 +118,7 @@ Markdown; a Ghost-style slug preview for non-Latin titles.
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 
 ## WS-3 · Dashboard widgets
-**Status:** review (Forecast is waiting on the user's look in Dashboard; Now Playing is parked) · **Branch:** `ws/widgets` · **Owns:** `widgets/`, `tools/widget_preview.py`
+**Status:** review (Forecast 0.2 is on the Mac after the user's first look; Now Playing is parked) · **Branch:** `ws/widgets` · **Owns:** `widgets/`, `tools/widget_preview.py`
 
 - **Weather** in the style of Apple's widget (big temperature, condition art, 6-day strip) using
   Open-Meteo (no key). Dashboard's WebKit can't do modern TLS, so fetch through
@@ -128,7 +128,7 @@ Markdown; a Ghost-style slug preview for non-Latin titles.
 - Stretch: Hacker News top 10, a currency converter.
 
 Done (2026-11-08):
-- `widgets/Forecast.wdgt` 0.1 is Lion's Weather reimagined on Open-Meteo. It has a slate panel by
+- `widgets/Forecast.wdgt` (0.2) is Lion's Weather reimagined on Open-Meteo. It has a slate panel by
   day and plum by night, canvas-drawn condition art (the moon shows its real phase), a six-day strip
   that folds away on click, and a linen back with city search, °C/°F and Apple's info and Done
   buttons. The last forecast is cached in the widget's prefs so Dashboard never opens to a blank.
@@ -140,9 +140,12 @@ Done (2026-11-08):
   `~/Library/LionKitDev/com.apple.dashboard.plist.backup`.
 
 Next:
-- Get the user's screenshot of Forecast in Dashboard. Check the close-box position
-  (`CloseBoxInsetX/Y` 9/41), the flip, the fold animation and the window resizes, none of which the
-  preview can show. Ask whether Apple's broken Weather widget should come out of the layer.
+- The user has seen Forecast in Dashboard and likes the look and the animations. 0.2 makes the back
+  the same size as the open front (Done now sits in the info button's corner) and holds
+  `widget.system()` commands until they finish. That's the likely cause of one DashboardClient
+  crash (18:09, SIGSEGV in a WebKit GC pass), but it isn't confirmed; watch
+  `~/Library/Logs/DiagnosticReports/DashboardClient_*`. Still unchecked: the close-box position
+  (`CloseBoxInsetX/Y` 9/41), and whether Apple's broken Weather widget should leave the layer.
 - **Now Playing** (not started): follow Kassett's mini player (`design/kassett/project/Mini.dc.html`),
   with an aluminium bar, a small cassette whose reels turn while playing, the title in Marker Felt
   and the artist in Noteworthy (both ship with Lion), and prev/play/next buttons. Clicking the cassette
