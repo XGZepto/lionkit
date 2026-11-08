@@ -637,6 +637,7 @@ class AppDelegate(NSObject):
         self.preview_ready = False
         self.fetching_images = set()
         self.shrinking = set()
+        self.kept_place = None
         self.search = u""
         cocoa.build_main_menu(
             APP_NAME, self,
@@ -792,6 +793,10 @@ class AppDelegate(NSObject):
                     cocoa.in_background(lambda: g.get_post(post_id),
                                         lambda p, e: (print("site", repr((p and p["status"], p and p.get("published_at"),
                                                                  p and p.get("email"), e))), sys.stdout.flush()))
+            elif name == "scrollto":
+                self.scrollToCharacter(max(0, self.textView.string().find(arg)))
+            elif name == "frame":
+                self.window.setFrame_display_(NSMakeRect(*[float(x) for x in arg.split(",")]), True)
             elif name == "reveal":
                 found = self.textView.string().find(arg)
                 if found >= 0:
@@ -810,8 +815,10 @@ class AppDelegate(NSObject):
             elif name == "size":
                 w, h = [float(x) for x in arg.split(",")]
                 frame = self.window.frame()
+                self.keepPlace()
                 self.window.setFrame_display_(NSMakeRect(frame.origin.x, frame.origin.y + frame.size.height - h,
                                                          w, h), True)
+                self.afterWidthChange()
             elif name == "title":
                 self.window.makeFirstResponder_(self.titleField)
                 editor = self.titleField.currentEditor()
@@ -847,8 +854,10 @@ class AppDelegate(NSObject):
                 item.setTag_(SHOW_REPLACE if arg == "replace" else NSFindPanelActionShowFindPanel)
                 self.window.makeFirstResponder_(self.textView)
                 self.textView.performFindPanelAction_(item)
-            elif name == "focus":
+            elif name == "focus":  # what full screen does to the layout, without switching Spaces
+                self.keepPlace()
                 self.setFocusMode(arg != "off")
+                self.afterWidthChange()
             elif name == "postlist":
                 self.togglePostList_(None)
 
@@ -1055,11 +1064,13 @@ class AppDelegate(NSObject):
                                            "editorFraction")
 
     def togglePostList_(self, sender):
+        self.keepPlace()
         sidebar = self.outer.subviews()[0]
         sidebar.setHidden_(not sidebar.isHidden())
         if not self.focus:
             self.defaults.setBool_forKey_(sidebar.isHidden(), "postListHidden")
         self.layoutPanes()
+        self.afterWidthChange()
 
     # ---- full screen: the post list steps aside, the toolbar slides in with the menu bar --------------
     def setFocusMode(self, on):
@@ -1073,10 +1084,18 @@ class AppDelegate(NSObject):
         self.updatePreview_(None)
 
     def windowWillEnterFullScreen_(self, note):
+        self.keepPlace()
         self.setFocusMode(True)
 
+    def windowDidEnterFullScreen_(self, note):
+        self.afterWidthChange()
+
     def windowWillExitFullScreen_(self, note):
+        self.keepPlace()
         self.setFocusMode(False)
+
+    def windowDidExitFullScreen_(self, note):
+        self.afterWidthChange()
 
     @objc.typedSelector("Q@:@Q")
     def window_willUseFullScreenPresentationOptions_(self, window, options):
@@ -1646,8 +1665,14 @@ class AppDelegate(NSObject):
         place = (self.defaults.dictionaryForKey_("places") or {}).get(self.doc["key"])
         top, loc, n = [min(int(x), length) for x in list(place)[:3]] if place else (0, 0, 0)
         tv.setSelectedRange_(NSMakeRange(loc, min(n, length - loc)))
+        self.scrollToCharacter(top)
+
+    def scrollToCharacter(self, top):
+        """Put the line holding character `top` at the top of the editor; 0 shows the title."""
+        tv, clip = self.textView, self.editorScroll.contentView()
+        length = len(tv.string())
         y = 0
-        if top > 0:
+        if 0 < top and length:
             lm = tv.layoutManager()
             lm.ensureLayoutForTextContainer_(tv.textContainer())  # all of it, or the scroll gets clamped
             tv.sizeToFit()
@@ -1656,6 +1681,33 @@ class AppDelegate(NSObject):
             y = line.origin.y + tv.textContainerOrigin().y
         clip.scrollToPoint_(clip.constrainScrollPoint_(NSMakePoint(0, y)))
         self.editorScroll.reflectScrolledClipView_(clip)
+
+    # When the editor gets wider or narrower, NSTextView keeps its first visible character at the
+    # top while it re-wraps. The title sits above the text inside the scroll view, so at the top of
+    # a post that scrolled the title out of view (and full screen showed stale pixels until a
+    # scroll). So: note what's at the top before a width change, and go back to it afterwards.
+    def keepPlace(self):
+        """Call before a width change."""
+        if self.kept_place is None:
+            self.kept_place = self.topCharacter()
+
+    def afterWidthChange(self):
+        """Call after it: back to the kept place now, and again once AppKit's deferred layout ran."""
+        if self.kept_place is not None:
+            self.scrollToCharacter(self.kept_place)
+            self.performSelector_withObject_afterDelay_("returnToKeptPlace:", None, 0.0)
+
+    def returnToKeptPlace_(self, _):
+        if self.kept_place is not None:
+            self.scrollToCharacter(self.kept_place)
+            self.kept_place = None
+        self.window.contentView().setNeedsDisplay_(True)
+
+    def windowWillStartLiveResize_(self, note):
+        self.keepPlace()
+
+    def windowDidEndLiveResize_(self, note):
+        self.afterWidthChange()
 
     def applicationWillTerminate_(self, note):
         self.rememberPlace_(None)
@@ -1943,9 +1995,11 @@ class AppDelegate(NSObject):
             len(refs), u"" if len(refs) == 1 else u"s", APP_NAME, u"it" if len(refs) == 1 else u"them"))
 
     def togglePreview_(self, sender):
+        self.keepPlace()
         self.preview.setHidden_(not self.preview.isHidden())
         self.defaults.setBool_forKey_(self.preview.isHidden(), "previewHidden")
         self.layoutEditor()
+        self.afterWidthChange()
         self.updatePreview_(None)
 
     def openInBrowser_(self, sender):

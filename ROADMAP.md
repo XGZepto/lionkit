@@ -128,6 +128,9 @@ Done and checked on the Mac (screenshots, or the app's own snapshot while the sc
   attributes no longer stretch. Captions can hold quotes (`\"`), and captioned local pictures now
   upload (they didn't match before). Round trip: identical on all 12 posts, 1 block kept as a card.
 
+- Entering or leaving full screen (and resizing, or showing the preview or post list) no longer
+  scrolls the title out of view or leaves stale pixels: the editor goes back to what was at its top.
+
 Waiting on the user:
 - Try full screen and opening the preview there again, and say whether the lag is gone.
 
