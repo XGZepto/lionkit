@@ -1943,6 +1943,16 @@ class Library(NSObject):
 
     # ---- hidden hook ---------------------------------------------------------------------------------
     def debugOpen(self, view):
+        if view.startswith("album-search:") or view.startswith("artist-search:"):
+            kind, text = view.split(":", 1)
+            kind = kind.split("-")[0]
+            client = self.client
+
+            def work():   # open the first album or artist Spotify finds for the text
+                found = (client.search(text, kind).get(kind + "s") or {}).get("items") or []
+                return found[0]["id"] if found else None
+            cocoa.in_background(work, lambda found, error: found and self.go((kind, found)))
+            return
         if view in ("artist-bounce", "albums-bounce"):
             self.bounce = view
             view = view.split("-")[0]

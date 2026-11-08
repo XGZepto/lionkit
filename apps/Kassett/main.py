@@ -761,8 +761,10 @@ class AppDelegate(NSObject):
         self.upnext.toggleFrom_(self.deck.upNextButton)
 
     def refreshQueue(self):
-        if self.fake:
-            self.upnext.show(self.item(), self.context_name or u"The Lion’s Roar", [], None)
+        if self.fake:      # sample songs, so the popover can be checked (and shown) without an account
+            import fakeclient
+            queue = [fakeclient.track(n, by, secs) for n, by, secs in fakeclient.MIX[:8]]
+            self.upnext.show(self.item(), self.context_name or u"The Lion’s Roar", queue, None)
             return
 
         def done(q, error):
