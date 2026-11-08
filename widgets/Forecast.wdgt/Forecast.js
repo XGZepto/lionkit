@@ -12,7 +12,7 @@ var REFRESH_MINUTES = 30;   // while Dashboard is showing
 var STALE_MINUTES = 10;     // refresh on show if the data is older than this
 
 // Window and panel heights; keep in step with Forecast.css.
-var WIDTH = 300, COLLAPSED = 110, EXPANDED = 222, BACK = 202;
+var WIDTH = 300, COLLAPSED = 110, EXPANDED = 222, BACK = 222;
 var PANEL_CLOSED = 58, PANEL_OPEN = 170, FORECAST = 112;
 
 var FAHRENHEIT_COUNTRIES = { US: 1, LR: 1, MM: 1, BS: 1, BZ: 1, KY: 1, PW: 1, FM: 1, MH: 1 };
@@ -20,6 +20,7 @@ var DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 var state = { place: null, units: null, expanded: true, data: null, fetchedAt: 0, error: null, busy: false };
 var timer = null;
+var running = [];   // widget.system() commands still in flight; see fetchJSON
 var search = { timer: null, text: null, busy: false, results: [], doneWhenFound: false };
 
 
@@ -71,12 +72,16 @@ function describeFailure(result) {
 }
 
 // done(data, problem): problem is "missing" (no LionKit), "offline" or "failed".
+// Each command object is held until its handler runs: if the widget lets go of it while curl
+// is still running, Lion's WebKit can collect it and DashboardClient crashes in a later GC.
 function fetchJSON(url, done) {
     if (!window.widget || !widget.system) {
         done(null, "failed");
         return;
     }
-    widget.system(CURL + " -sS --fail --compressed --max-time 20 " + shellQuote(url), function (result) {
+    var command = widget.system(CURL + " -sS --fail --compressed --max-time 20 " + shellQuote(url), function (result) {
+        var i = indexOf(running, command);
+        if (i >= 0) running.splice(i, 1);
         var data = null;
         if (result.status === 0) {
             try {
@@ -87,6 +92,7 @@ function fetchJSON(url, done) {
         }
         done(data, data ? null : describeFailure(result));
     });
+    running.push(command);
 }
 
 function refresh() {
@@ -271,7 +277,7 @@ function showBack(event) {
         widget.prepareForTransition("ToBack");
     }
     if (!linenDrawn) {
-        Art.linen(document.getElementById("linen"), 8, 38, 284, 150, 11);
+        Art.linen(document.getElementById("linen"), 8, 38, 284, PANEL_OPEN, 11);
         linenDrawn = true;
     }
     document.getElementById("front").style.display = "none";
