@@ -154,6 +154,25 @@ def circle_key(e):
     return ("circle", a.get("id"), int(r.size.width), int(r.size.height), have_art(a.get("image")))
 
 
+class OvershootClipView(NSClipView):
+    """When Lion's scrolling bounces past the top or bottom of a page, paint what would be there:
+    the page's `top_fill` and `bottom_fill` (the artist photo carrying on, the walnut wall), else white."""
+
+    def drawRect_(self, rect):
+        page = self.documentView()
+        height = page.frame().size.height if page else 0
+        for area, fill in ((NSIntersectionRect(rect, NSMakeRect(rect.origin.x, -1e5, rect.size.width, 1e5)),
+                            getattr(page, "top_fill", None)),
+                           (NSIntersectionRect(rect, NSMakeRect(rect.origin.x, height, rect.size.width, 1e5)),
+                            getattr(page, "bottom_fill", None))):
+            if area.size.width <= 0 or area.size.height <= 0:
+                continue
+            if fill:
+                fill(area)
+            else:
+                paint.fill(area, "#ffffff")
+
+
 class CanvasView(LibraryFlipped):
     """Asks `builder(width)` for (items, height). Each item is a dict with a `rect`, a `draw(item,
     selected)` function and optional `click`, `double` and `menu` callbacks."""
@@ -162,6 +181,7 @@ class CanvasView(LibraryFlipped):
         self = super(CanvasView, self).initWithFrame_(frame)
         if self:
             self.builder, self.nearEnd, self.backdrop = None, None, None
+            self.top_fill, self.bottom_fill = None, None     # what shows past the ends when scrolling bounces
             self.items, self.selected, self.width = [], None, 0
             self.rendered = collections.OrderedDict()     # cache key -> NSImage of an item, most recent last
         return self
@@ -988,6 +1008,8 @@ class Library(NSObject):
         scroll.setHasVerticalScroller_(True)
         scroll.setBorderType_(NSNoBorder)
         scroll.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
+        clip = OvershootClipView.alloc().initWithFrame_(scroll.contentView().frame())
+        scroll.setContentView_(clip)
         canvas = CanvasView.alloc().initWithFrame_(scroll.contentView().bounds())
         canvas.library = self
         scroll.setDocumentView_(canvas)
@@ -1621,6 +1643,10 @@ class Library(NSObject):
         canvas.rebuild()
         if top:
             canvas.scrollToTop()
+        if getattr(self, "bounce", None) == "albums-bounce":
+            self.bounce = None
+            clip = canvas.superview()
+            clip.setBoundsOrigin_(NSMakePoint(0, canvas.frame().size.height - clip.bounds().size.height + 90))
         if not items:
             self.showMessage(u"No albums yet" if not round_ else u"No artists yet",
                              u"Albums you save in Spotify show up here." if not round_ else
@@ -1642,7 +1668,7 @@ class Library(NSObject):
                             "click": lambda e: self.go(("artist", e["data"]["id"])), "cache": circle_key})
         rows = (len(items) + cols - 1) // cols
         if round_:
-            canvas.backdrop = None
+            canvas.backdrop = canvas.top_fill = canvas.bottom_fill = None
             return out, 20 + rows * (min(118, cw) + 30 + 22) + 20
         return self.shelfItems(width, items)
 
@@ -1650,6 +1676,7 @@ class Library(NSObject):
         """Albums as tapes standing on walnut shelves."""
         out, height = self.shelf(self.gridCanvas, width, items, 0, 2)
         self.gridCanvas.backdrop = draw_wall
+        self.gridCanvas.top_fill = self.gridCanvas.bottom_fill = draw_wall
         return out, height
 
     def shelf(self, canvas, width, items, top, min_rows):
@@ -1723,6 +1750,9 @@ class Library(NSObject):
         self.canvas.rebuild()
         if top:
             self.canvas.scrollToTop()
+        if getattr(self, "bounce", None) == "artist-bounce":
+            self.bounce = None
+            self.canvas.superview().setBoundsOrigin_(NSMakePoint(0, -90))
         name_w = paint.text_width(a["info"]["name"], paint.font("Helvetica-Bold", 44, True), -0.8)
         f = a["following"]
         self.followButton.setHidden_(f is None)
@@ -1778,6 +1808,8 @@ class Library(NSObject):
         items += shelf
         canvas.backdrop = lambda rect: (paint.fill(rect, "#ffffff"), draw_wall(
             NSIntersectionRect(rect, NSMakeRect(0, wall_top, width, 1e6))))
+        canvas.top_fill = lambda rect: draw_artist_backdrop(rect, width, info, canvas)
+        canvas.bottom_fill = draw_wall
         return items, end
 
     def songItem(self, rect, t, n, play, show_album=False):
@@ -1801,7 +1833,7 @@ class Library(NSObject):
             songs, artists, albums = result
             self.found = (text, songs, artists, albums)
             self.showPage(self.canvasPage)
-            self.canvas.backdrop = None
+            self.canvas.backdrop = self.canvas.top_fill = self.canvas.bottom_fill = None
             self.canvas.builder = lambda width: self.searchItems(width)
             self.canvas.nearEnd = None
             self.canvas.rebuild()
@@ -1911,6 +1943,9 @@ class Library(NSObject):
 
     # ---- hidden hook ---------------------------------------------------------------------------------
     def debugOpen(self, view):
+        if view in ("artist-bounce", "albums-bounce"):
+            self.bounce = view
+            view = view.split("-")[0]
         if view.startswith("search:"):
             self.go(("search", view[7:]))
         elif view in ("liked", "albums", "artists"):
@@ -2143,18 +2178,39 @@ def draw_song_row(e, t, n, selected, canvas, show_album, playing):
     paint.text(paint.fmt(t["duration"]), NSMakeRect(x + w - 40, y + 9, 36, 16), paint.ui(12), gray, NSRightTextAlignment)
 
 
-def draw_artist_header(e, info, canvas):
-    r = e["rect"]
-    img = art.shared().image(info.get("big"), lambda: canvas.setNeedsDisplayInRect_(r))
-    paint.fill(r, ("#7a5532", 0), ("#3a2414", 0.6), ("#1e130b", 1), angle=45)
-    if img is not None:
-        photo = NSMakeRect(r.size.width * 0.45, 0, r.size.width * 0.55, r.size.height)
-        paint.image(img, photo, 0.9)
-        paint.fill(photo, ("#3a2414", 0), (hexc("#3a2414", 0.0), 0.6), angle=0)
-        paint.fill(r, white(0, 0.0), white(0, 0.35))
+def draw_artist_backdrop(area, width, info, canvas):
+    """The header's brown wash and the artist's photo, laid out for the header band but drawn
+    wherever `area` is, so above the page (when scrolling bounces) the picture simply carries on."""
+    base = NSMakeRect(0, 0, width, ARTIST_HEAD)
+    img = art.shared().image(info.get("big"), lambda: canvas.setNeedsDisplayInRect_(base))
+    NSGraphicsContext.saveGraphicsState()
+    NSBezierPath.clipRect_(area)
+    paint.gradient(("#7a5532", 0), ("#3a2414", 0.6), ("#1e130b", 1)).drawFromPoint_toPoint_options_(
+        NSMakePoint(0, -ARTIST_HEAD * 0.4), NSMakePoint(width * 0.6, ARTIST_HEAD * 1.4),
+        NSGradientDrawsBeforeStartingLocation | NSGradientDrawsAfterEndingLocation)
+    if img is not None and img.size().width and img.size().height:
+        photo = NSMakeRect(width * 0.45, 0, width * 0.55, ARTIST_HEAD)
+        size = img.size()
+        scale = max(photo.size.width / size.width, photo.size.height / size.height)
+        whole = NSMakeRect(photo.origin.x + (photo.size.width - size.width * scale) / 2.0,
+                           (ARTIST_HEAD - size.height * scale) / 2.0, size.width * scale, size.height * scale)
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath.clipRect_(NSMakeRect(photo.origin.x, -1e5, photo.size.width, 2e5))
+        img.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+            whole, NSZeroRect, NSCompositeSourceOver, 0.9, True, {NSImageHintInterpolation: NSImageInterpolationHigh})
+        NSGraphicsContext.restoreGraphicsState()
+        paint.fill(NSMakeRect(photo.origin.x, area.origin.y, photo.size.width, area.size.height),
+                   ("#3a2414", 0), (hexc("#3a2414", 0.0), 0.6), angle=0)
+        paint.fill(NSIntersectionRect(area, base), white(0, 0.0), white(0, 0.35)) if NSIntersectsRect(area, base) else None
     else:
         NSGradient.alloc().initWithStartingColor_endingColor_(hexc("#ffd696", 0.45), hexc("#ffd696", 0)) \
-            .drawInRect_relativeCenterPosition_(r, NSMakePoint(0.5, -0.4))
+            .drawInRect_relativeCenterPosition_(base, NSMakePoint(0.5, -0.4))
+    NSGraphicsContext.restoreGraphicsState()
+
+
+def draw_artist_header(e, info, canvas):
+    r = e["rect"]
+    draw_artist_backdrop(r, r.size.width, info, canvas)
     paint.fill(NSMakeRect(0, r.size.height - 1, r.size.width, 1), white(0, 0.4))
     paint.text(u"ARTIST", NSMakeRect(26, r.size.height - 20 - 44 - 22, 200, 14), paint.ui(10, True), white(1, 0.85), kern=1)
     paint.text(info["name"], NSMakeRect(26, r.size.height - 20 - 48, r.size.width - 200, 52),
