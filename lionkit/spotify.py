@@ -213,12 +213,15 @@ class Spotify(object):
                 msg, reason = err.get("message"), err.get("reason")
             except Exception:
                 pass
-            if r.status == 429:
+            if r.status == 403 and msg and "regist" in msg.lower():
+                # A Development Mode app only works for accounts its owner added in the dashboard.
+                reason, msg = "NOT_ALLOWLISTED", "Spotify hasn't added this account to the app's list of users."
+            elif r.status == 429:
                 msg = "Spotify asked Kassett to slow down. It will try again in a moment."
             elif reason in REASONS:
                 msg = REASONS[reason]
             elif msg and "scope" in msg.lower():
-                msg = "Log out and in again (Kassett > Preferences) to allow this."
+                reason, msg = "SCOPE", "This login doesn't allow that yet. Log in again to give permission."
             raise SpotifyError(msg or "Spotify answered HTTP %d" % r.status, r.status, reason)
         try:
             return r.json()

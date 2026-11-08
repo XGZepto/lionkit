@@ -18,6 +18,7 @@ from lionkit import cocoa, http, spotify
 import art
 import deck
 import glyphs
+import ownapp
 import upnext
 
 APP_NAME = "Kassett"
@@ -99,6 +100,9 @@ class AppDelegate(NSObject):
         self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(1.0, self, "tick:", None, True)
         self.tick_(None)
         self.performSelector_withObject_afterDelay_("debugOpen:", None, 1.5)
+        if self.defaults.stringForKey_("DebugSnapshot"):
+            self.performSelector_withObject_afterDelay_("debugSnapshot:", None,
+                                                        self.defaults.floatForKey_("DebugSnapshotDelay") or 10)
 
     # ---- menus -------------------------------------------------------------------------------------
     def buildMenus(self):
@@ -156,6 +160,11 @@ class AppDelegate(NSObject):
     # ---- connection & state ------------------------------------------------------------------------
     def clientID(self):
         return (self.defaults.stringForKey_("clientID") or u"").strip() or CLIENT_ID
+
+    def customClientID(self):
+        """The Client ID of the person's own Spotify app, or an empty string when they use Kassett's."""
+        cid = self.clientID()
+        return u"" if cid == CLIENT_ID else cid
 
     def connect(self):
         self.client = spotify.Spotify(self.clientID())
@@ -245,6 +254,8 @@ class AppDelegate(NSObject):
         if serial != self.serial:
             return  # a command went out while we were asking; this answer may predate it
         if error:
+            if getattr(error, "reason", None) == "NOT_ALLOWLISTED":
+                return self.notAllowlisted()
             self.flash(unicode(error))
             return
         prev_id, prev_progress = self.item_id, self.estimatedProgress()
@@ -449,6 +460,30 @@ class AppDelegate(NSObject):
             return False
         return True
 
+    def playFrom(self, context, offset_uri, uris, position, shuffle):
+        """Play a list: in its Spotify context (album, playlist, Liked Songs) when there is one,
+        else as a list of songs. shuffle is True, False or None to leave Spotify's setting alone."""
+        if self.fake or not self.loggedIn() or not (context or uris):
+            return
+        client = self.client
+        current = bool((self.state or {}).get("shuffle_state"))
+
+        def work():
+            if shuffle is not None and shuffle != current:
+                try:
+                    client.set_shuffle(shuffle)
+                except spotify.SpotifyError:
+                    pass  # nothing is active yet; play below still works on the last device
+            if context:
+                try:
+                    client.play_context(context, offset_uri)
+                    return
+                except spotify.SpotifyError as e:
+                    if not uris or e.reason in ("PREMIUM_REQUIRED", "NO_ACTIVE_DEVICE"):
+                        raise
+            client.play_tracks(uris, position)
+        self.send(work, 1.0)
+
     def setShell_(self, sender):
         self.deck.cassette.shell = sender.representedObject()
         self.deck.cassette.setNeedsDisplay_(True)
@@ -457,11 +492,7 @@ class AppDelegate(NSObject):
     # ---- windows -----------------------------------------------------------------------------------
     def showLibrary_(self, sender):
         if self.library is None:
-            try:
-                import library
-            except ImportError:  # the library browser is still being built (see ROADMAP.md, WS-1)
-                self.flash(u"The library browser isn\u2019t in this build yet.")
-                return
+            import library
             self.library = library.Library.alloc().initWithApp_(self)
             self.library.showState(self.state, self.estimatedProgress())
         self.library.window.makeKeyAndOrderFront_(None)
@@ -572,6 +603,18 @@ class AppDelegate(NSObject):
         cocoa.in_background(lambda: self.client.transfer(device_id, play), done)
 
     # ---- login -------------------------------------------------------------------------------------
+    def libraryClient(self):
+        if self.fake:
+            import fakeclient
+            return fakeclient.FakeSpotify()
+        return self.client
+
+    def logInAgain_(self, sender):
+        if self.client:
+            self.client.logout()
+        self.showLoggedIn(False)
+        self.logIn_(sender)
+
     def logIn_(self, sender):
         self.connect()
         self.deck.setTape(u"Logging in…", u"Finish in the browser window")
@@ -589,10 +632,37 @@ class AppDelegate(NSObject):
         else:
             self.showLoggedIn(True)
             NSApp.activateIgnoringOtherApps_(True)
+            self.checkAllowed()
+        self.updateAccount()
+
+    def checkAllowed(self):
+        """A Development Mode Spotify app lets anyone log in, then refuses accounts it hasn't added."""
+        def done(profile, error):
+            if getattr(error, "reason", None) == "NOT_ALLOWLISTED":
+                return self.notAllowlisted()
+            self.profile = None
             self.poll()
             if self.library:
                 self.library.reload()
+            self.updateAccount()
+        cocoa.in_background(self.client.me, done)
+
+    def notAllowlisted(self):
+        if self.client and self.client.logged_in:
+            self.client.logout()  # the login is no use to this Spotify app
+        self.state, self.profile = None, None
+        self.showLoggedIn(False)
+        self.deck.setTape(APP_NAME, u"This Spotify account can’t use Kassett’s app")
         self.updateAccount()
+        if self.library:
+            self.library.reload()
+        if getattr(self, "ownApp", None) is None:
+            self.ownApp = ownapp.OwnAppSheet.alloc().initWithApp_(self)
+        window = NSApp.keyWindow()
+        if window not in (self.deck.window, getattr(self.library, "window", None)):
+            self.showDeck_(None)
+            window = self.deck.window
+        self.ownApp.showFor(window)
 
     # ---- preferences: just the Spotify account -----------------------------------------------------
     def showPreferences_(self, sender):
@@ -697,7 +767,7 @@ class AppDelegate(NSObject):
     # ---- hidden hooks for checking screens from the dev machine ------------------------------------
     def debugOpen_(self, _):
         """`defaults write page.zepto.kassett DebugOpenView <view>` opens a screen at launch:
-        mini, upnext, library, or library:<liked|albums|artists|playlist|album|artist|search:text>."""
+        mini, upnext, ownapp, ownapp-guide, library, or library:<liked|albums|artists|playlist|album|artist|search:text>."""
         view = self.defaults.stringForKey_("DebugOpenView")
         if not view:
             return
@@ -706,10 +776,34 @@ class AppDelegate(NSObject):
         elif view == "upnext":
             self.upnext.popover.setBehavior_(upnext.POPOVER_APP_DEFINED)
             self.showUpNext_(None)
+        elif view.startswith("ownapp"):
+            self.ownApp = ownapp.OwnAppSheet.alloc().initWithApp_(self)
+            self.ownApp.showFor(self.deck.window)
+            if view == "ownapp-guide":
+                self.ownApp.showGuide_(None)
         elif view.startswith("library"):
             self.showLibrary_(None)
             if ":" in view:
                 self.library.debugOpen(view.split(":", 1)[1])
+
+
+    def debugSnapshot_(self, _):
+        """`defaults write page.zepto.kassett DebugSnapshot /tmp/kassett` makes Kassett draw its visible
+        windows into PNGs (/tmp/kassett-<window>.png). This works while the screen is locked."""
+        prefix = self.defaults.stringForKey_("DebugSnapshot")
+        windows = [("deck", self.deck.window), ("mini", self.mini.window),
+                   ("library", getattr(self.library, "window", None)),
+                   ("sheet", getattr(getattr(self, "ownApp", None), "sheet", None)),
+                   ("upnext", self.upnext.view.window() if self.upnext.isShown() else None)]
+        for name, w in windows:
+            if w is None or not w.isVisible():
+                continue
+            view = w.contentView().superview() or w.contentView()
+            rep = view.bitmapImageRepForCachingDisplayInRect_(view.bounds())
+            view.cacheDisplayInRect_toBitmapImageRep_(view.bounds(), rep)
+            rep.representationUsingType_properties_(NSPNGFileType, None).writeToFile_atomically_(
+                "%s-%s.png" % (prefix, name), True)
+            print("snapshot %s-%s.png" % (prefix, name))
 
 
 if __name__ == "__main__":

@@ -79,8 +79,8 @@ def draw_placeholder(rect, name, caption=None, round_=False, caption_size=13):
 
 
 def initials(name):
-    words = [w for w in (name or u"").replace(u"&", u" ").split() if w.lower() not in (u"the", u"and")]
-    return u"".join(w[0].upper() for w in words[:2] if w[0].isalnum()) or u"♫"
+    words = [w for w in (name or u"").split() if w[0].isalnum() and w.lower() not in (u"the", u"and")]
+    return u"".join(w[0].upper() for w in words[:2]) or u"♫"
 
 
 class ArtCache(object):

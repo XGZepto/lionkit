@@ -50,28 +50,29 @@ milestone is reached when all of these are true:
 ---
 
 ## WS-1 · Kassett: the cassette deck
-**Status:** in progress (parked 2026-11-08) · **Branch:** `ws/kassett` · **Owns:** `apps/Kassett`, `lionkit/spotify.py`
+**Status:** review (0.5, waiting on the user) · **Branch:** `ws/kassett` · **Owns:** `apps/Kassett`, `lionkit/spotify.py`
 
-**Done (on `ws/kassett`, deployed to the Mac):** the cassette deck is built and screenshot-verified, including
-against the user's real account. It has turning reels that spin by pack size, packs that grow by area,
-latching keys, a rolling tape counter, a knob that changes volume by drag or scroll, a seekable progress bar and
-J-card art from the disk cache. Seeking and skipping whirr the reels. The window uses 61 MB of memory. The Up
-Next popover is verified with fake data, and the cassette color can be changed under View. The device menu now
-has a "Play On" header, device-type icons and a "busy" note. The mini player and a Controls menu with shortcuts
-are written. `lionkit/spotify.py` has the library, catalog, queue and `/me/library` calls, follows Spotify's
-February 2026 Development Mode rules, and re-reads the keychain token before refreshing (for the WS-3 widget).
-Code: `main.py`, `deck.py`, `upnext.py`, `paint.py`, `glyphs.py`, `art.py`.
+**Done:** The cassette deck, mini player, Up Next popover, device menu and Controls menu shipped earlier (see
+git history). In 0.5 I added the library browser (`library.py`). It has a source list with Liked Songs,
+Albums, Artists and the user's playlists, iTunes-style track lists, album and artist grids, album and
+playlist pages, the artist page and search. Lists load 50 rows at a time, and right-clicking a song offers
+Play, Add to Up Next, Go to Album, Go to Artist and Add to (or Remove from) Liked Songs. I checked every view
+against the mockups with sample data (`fakeclient.py`). Liked Songs and the playlists also loaded from the
+user's real account, and the app stayed under 70 MB. When Spotify refuses an account that isn't on the
+allowlist, Kassett logs it out and shows a sheet (`ownapp.py`) that explains why. Its "Use My Own Spotify
+App…" button expands the sheet into a three-step guide with the redirect URI and a Client ID field that saves
+the `clientID` default and logs in again. Preferences still only has Log In and Log Out. The version is 0.5.
 
-**Next:** I still need to write `apps/Kassett/library.py`, the library browser. Until then the LIBRARY key and
-View > Show Library show a "not in this build yet" message. The plan for it is a source list, iTunes-style
-track lists with right-click Add to Up Next, album and artist grids, and the artist and search views. Because
-of the 2026 changes, the artist page's Popular list comes from an `artist:` search, followed playlists can be
-played but not listed, and search returns at most 10 results per type. After that, I need to check the mini
-player on screen (its capture came back empty), draw the cassette app icon in `icon.py`, bump the version to
-0.3, and ask the user to click through the devices menu, the transport keys and the Up Next popover with real
-playback. `user-follow-modify` was added, so the user should log out and in once to follow artists from Kassett.
-Debug hooks: `defaults write page.zepto.kassett DebugFakeState -bool yes` shows a fake song, and `DebugOpenView`
-opens `mini`, `upnext` or `library:<view>` at launch.
+**Notes:** Spotify's February 2026 limits shape a few things. The artist page's Popular list comes from an
+`artist:` search, followed playlists can be played but not listed, and search shows at most 10 results per
+type. The Mac's screen was locked for most of this session, so I added a hidden `DebugSnapshot` setting that
+makes Kassett draw its own windows into PNGs. `DebugFakeState` shows a fake song and the sample library, and
+`DebugOpenView` opens `mini`, `upnext`, `ownapp`, `ownapp-guide` or `library:<view>` at launch.
+
+**Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
+the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
+cassette app icon in `icon.py` yet. I also couldn't test the not-allowlisted sheet with a real refused
+account, only through the debug hook.
 
 Turn Kassett from an iTunes-10-style remote into a cassette-deck player with a full library browser.
 The visual spec is **`design/kassett/`** (11 screens; see its README). Match it closely.
