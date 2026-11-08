@@ -1,79 +1,67 @@
 # -*- coding: utf-8 -*-
-"""Kassett: a Spotify Connect remote for Mac OS X Lion, in the style of iTunes 10.
+"""Kassett: a Spotify Connect remote for Mac OS X Lion, built like a cassette deck.
 
 The name is Swedish for cassette (Spotify started in Stockholm). Not made by Spotify."""
+import copy
 import os
 import sys
-import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from AppKit import *  # noqa: F401,F403
 from Foundation import *  # noqa: F401,F403
+import objc
 from PyObjCTools import AppHelper
 
-from lionkit import cocoa, http, icons, spotify
+from lionkit import cocoa, http, spotify
+import art
+import deck
+import glyphs
+import upnext
 
 APP_NAME = "Kassett"
-# The app's own Spotify Developer app (PKCE, so there is no secret to hide). Developer-mode apps only
-# accept up to 25 allowlisted accounts; anyone else can point the app at their own Client ID with
+# The app's own Spotify Developer app (PKCE, so there is no secret to hide). Development Mode apps
+# only accept a few allowlisted accounts; anyone else can point the app at their own Client ID with
 #   defaults write page.zepto.kassett clientID <id>
 CLIENT_ID = "3109bd6cf4aa4350b77a5f8c52e153d9"
-DEVICE_ICONS = {"Computer": "computer", "Smartphone": "phone", "Tablet": "phone"}
-POLL_EVERY = 3  # seconds between Spotify API polls; the LCD ticks every second in between
+POLL_EVERY = 3        # seconds between Spotify API polls; the deck animates in between
+SEEK_STEP = 15000     # REW and FF move 15 seconds
+FLASH = 6             # seconds an error stays in the bottom bar
+SUPPORT = os.path.expanduser("~/Library/Caches/Kassett")
+
+# `defaults write page.zepto.kassett DebugFakeState -bool yes` shows this instead of polling Spotify,
+# so the deck can be checked without touching anyone's real playback.
+FAKE_STATE = {
+    "is_playing": True, "progress_ms": 103000, "shuffle_state": False,
+    "device": {"id": "fake", "name": u"Living Room", "type": "Speaker", "volume_percent": 64},
+    "context": {"type": "album", "uri": "spotify:album:fake"},
+    "item": {"id": "fake1", "uri": "spotify:track:fake1", "type": "track", "name": u"The Lion’s Roar",
+             "duration_ms": 245000, "artists": [{"id": "fakeartist", "name": u"First Aid Kit"}],
+             "album": {"id": "fakealbum", "name": u"The Lion’s Roar", "release_date": "2012-01-13", "images": []}},
+}
 
 
-def rgb(r, g, b, a=1.0):
-    return NSColor.colorWithCalibratedRed_green_blue_alpha_(r / 255.0, g / 255.0, b / 255.0, a)
+def describe(item):
+    """Title, artist line, album, year and artwork of a track or podcast episode."""
+    if item.get("type") == "episode":
+        show = item.get("show") or {}
+        return {"title": item.get("name") or u"", "artist": show.get("name") or u"", "album": show.get("name") or u"",
+                "year": (item.get("release_date") or u"")[:4], "images": item.get("images") or show.get("images")}
+    album = item.get("album") or {}
+    return {"title": item.get("name") or u"",
+            "artist": u", ".join(a.get("name") or u"" for a in item.get("artists") or []),
+            "album": album.get("name") or u"", "year": (album.get("release_date") or u"")[:4],
+            "images": album.get("images")}
 
 
-def fmt(ms):
-    s = max(0, int(ms / 1000))
-    return u"%d:%02d" % (s // 60, s % 60)
-
-
-class LCDView(NSView):
-    """The iTunes 10 status display: track, artist, progress bar and times."""
-
-    def initWithFrame_(self, frame):
-        self = super(LCDView, self).initWithFrame_(frame)
-        if self:
-            self.line1, self.line2 = APP_NAME, u""
-            self.progress, self.duration = 0, 0
-        return self
-
-    def drawRect_(self, rect):
-        b = NSInsetRect(self.bounds(), 0.5, 0.5)
-        shape = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(b, 6, 6)
-        NSGradient.alloc().initWithStartingColor_endingColor_(rgb(247, 249, 238), rgb(214, 220, 198)).drawInBezierPath_angle_(shape, -90)
-        rgb(120, 124, 110).set()
-        shape.setLineWidth_(1)
-        shape.stroke()
-        w, h = b.size.width, b.size.height
-
-        def centered(text, y, font, color):
-            para = NSMutableParagraphStyle.alloc().init()
-            para.setAlignment_(NSCenterTextAlignment)
-            para.setLineBreakMode_(NSLineBreakByTruncatingTail)
-            attrs = {NSFontAttributeName: font, NSForegroundColorAttributeName: color, NSParagraphStyleAttributeName: para}
-            NSAttributedString.alloc().initWithString_attributes_(text, attrs).drawInRect_(NSMakeRect(36, y, w - 72, 16))
-
-        ink = rgb(40, 42, 36)
-        centered(self.line1, h - 22, NSFont.boldSystemFontOfSize_(12), ink)
-        centered(self.line2, h - 39, NSFont.systemFontOfSize_(11), rgb(70, 72, 64))
-        if self.duration:
-            track = NSMakeRect(46, 12, w - 92, 7)
-            NSColor.colorWithCalibratedWhite_alpha_(0.0, 0.18).set()
-            NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(track, 3.5, 3.5).fill()
-            filled = NSMakeRect(track.origin.x, track.origin.y,
-                                track.size.width * min(1.0, float(self.progress) / self.duration), track.size.height)
-            rgb(60, 64, 54).set()
-            NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(filled, 3.5, 3.5).fill()
-            small = {NSFontAttributeName: NSFont.systemFontOfSize_(9.5), NSForegroundColorAttributeName: ink}
-            NSAttributedString.alloc().initWithString_attributes_(fmt(self.progress), small).drawAtPoint_(NSMakePoint(10, 8))
-            remain = NSAttributedString.alloc().initWithString_attributes_(u"-" + fmt(self.duration - self.progress), small)
-            remain.drawAtPoint_(NSMakePoint(w - 10 - remain.size().width, 8))
+def subtitle(info):
+    line = info["artist"]
+    if info["album"] and info["album"] != info["artist"]:
+        line += u" — " + info["album"]
+    if info["year"]:
+        line += u" (%s)" % info["year"]
+    return line
 
 
 class AppDelegate(NSObject):
@@ -83,175 +71,458 @@ class AppDelegate(NSObject):
         self.client = None
         self.state = None
         self.fetched_at = 0
-        self.art_url = None
         self.busy = False
+        self.serial = 0
         self.ticks = 0
         self.devices = []
         self.profile = None
-        cocoa.build_main_menu(APP_NAME, self)
-        self.buildWindow()
+        self.item_id = None
+        self.art_url = None
+        self.context_uri, self.context_name, self.context_names = None, u"", {}
+        self.flash_until, self.flash_text = 0, None
+        self.volume_sent = 0
+        self.library = None
+        self.fake = self.defaults.boolForKey_("DebugFakeState")
+        art.shared()
+        self.buildMenus()
+        self.deck = deck.Deck.alloc().initWithApp_(self)
+        self.deck.cassette.shell = self.defaults.stringForKey_("CassetteShell") or "black"
+        self.mini = deck.Mini.alloc().initWithApp_(self)
+        self.upnext = upnext.UpNext.alloc().initWithApp_(self)
+        for w in (self.deck.window, self.mini.window):
+            w.setReleasedWhenClosed_(False)
         self.connect()
+        (self.mini if self.defaults.boolForKey_("MiniMode") else self.deck).window.makeKeyAndOrderFront_(None)
+        if self.fake:
+            self.state, self.fetched_at = copy.deepcopy(FAKE_STATE), time.time()
+            self.applyState(None, 0)
         self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(1.0, self, "tick:", None, True)
         self.tick_(None)
+        self.performSelector_withObject_afterDelay_("debugOpen:", None, 1.5)
 
-    def buildWindow(self):
-        w = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 480, 170),
-            NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSTexturedBackgroundWindowMask,
-            NSBackingStoreBuffered, False)
-        w.setTitle_(APP_NAME)
-        w.setFrameAutosaveName_("KassettMain")
-        if not w.setFrameUsingName_("KassettMain"):
-            w.center()
-        v = w.contentView()
+    # ---- menus -------------------------------------------------------------------------------------
+    def buildMenus(self):
+        cmd, opt, shift = NSCommandKeyMask, NSAlternateKeyMask, NSShiftKeyMask
+        cocoa.build_main_menu(APP_NAME, self, view_items=[
+            (u"Show Library", "showLibrary:", "l"),
+            (u"Switch to Mini Player", "toggleMini:", "m", cmd | shift),
+            (u"Show Up Next", "showUpNext:", "u", cmd | opt), None])
+        main = NSApp.mainMenu()
+        view = main.itemWithTitle_("View").submenu()
+        shells = view.addItemWithTitle_action_keyEquivalent_(u"Cassette", None, "")
+        sub = NSMenu.alloc().initWithTitle_(u"Cassette")
+        for title, key in ((u"Black", "black"), (u"Smoke", "smoke"), (u"White", "white")):
+            it = sub.addItemWithTitle_action_keyEquivalent_(title, "setShell:", "")
+            it.setRepresentedObject_(key)
+            it.setTarget_(self)
+        shells.setSubmenu_(sub)
 
-        self.art = NSImageView.alloc().initWithFrame_(NSMakeRect(14, 14, 142, 142))
-        self.art.setImageFrameStyle_(NSImageFramePhoto)
-        self.art.setImageScaling_(NSImageScaleProportionallyUpOrDown)
-        v.addSubview_(self.art)
+        controls = NSMenu.alloc().initWithTitle_(u"Controls")
+        left, right = NSLeftArrowFunctionKey, NSRightArrowFunctionKey
+        up, down = NSUpArrowFunctionKey, NSDownArrowFunctionKey
+        for spec in ((u"Play", "playPause:", "", 0), None,
+                     (u"Next Song", "next:", right, cmd), (u"Previous Song", "previous:", left, cmd),
+                     (u"Forward 15 Seconds", "fastForward:", right, cmd | opt),
+                     (u"Back 15 Seconds", "rewind:", left, cmd | opt), None,
+                     (u"Volume Up", "volumeUp:", up, cmd), (u"Volume Down", "volumeDown:", down, cmd)):
+            if spec is None:
+                controls.addItem_(NSMenuItem.separatorItem())
+                continue
+            it = controls.addItemWithTitle_action_keyEquivalent_(spec[0], spec[1], spec[2])
+            it.setKeyEquivalentModifierMask_(spec[3])
+            it.setTarget_(self)
+        top = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(u"Controls", None, "")
+        top.setSubmenu_(controls)
+        main.insertItem_atIndex_(top, main.indexOfItemWithTitle_("Window"))
 
-        self.lcd = LCDView.alloc().initWithFrame_(NSMakeRect(170, 82, 296, 74))
-        v.addSubview_(self.lcd)
+    def validateMenuItem_(self, item):
+        action = item.action()
+        has_item = bool(self.item())
+        if action == "playPause:":
+            item.setTitle_(u"Pause" if self.isPlaying() else u"Play")
+            return self.loggedIn()
+        if action in ("next:", "previous:", "fastForward:", "rewind:"):
+            return has_item
+        if action in ("volumeUp:", "volumeDown:"):
+            return self.volume() is not None
+        if action == "toggleMini:":
+            item.setTitle_(u"Switch to Cassette Deck" if self.mini.window.isVisible() else u"Switch to Mini Player")
+        if action == "showUpNext:":
+            return self.loggedIn()
+        if action == "setShell:":
+            item.setState_(NSOnState if item.representedObject() == self.deck.cassette.shell else NSOffState)
+        return True
 
-        def button(title, x, width, action):
-            b = NSButton.alloc().initWithFrame_(NSMakeRect(x, 40, width, 30))
-            b.setBezelStyle_(NSTexturedRoundedBezelStyle)
-            b.setTitle_(title)
-            b.setTarget_(self)
-            b.setAction_(action)
-            v.addSubview_(b)
-            return b
-
-        self.prevButton = button(u"◀◀", 170, 46, "previous:")
-        self.playButton = button(u"▶", 220, 56, "playPause:")
-        self.nextButton = button(u"▶▶", 280, 46, "next:")
-
-        self.volume = NSSlider.alloc().initWithFrame_(NSMakeRect(338, 45, 128, 21))
-        self.volume.cell().setControlSize_(NSSmallControlSize)
-        self.volume.setMinValue_(0)
-        self.volume.setMaxValue_(100)
-        self.volume.setContinuous_(False)
-        self.volume.setTarget_(self)
-        self.volume.setAction_("setVolume:")
-        v.addSubview_(self.volume)
-
-        self.device = NSTextField.alloc().initWithFrame_(NSMakeRect(170, 14, 252, 17))
-        self.device.setBezeled_(False)
-        self.device.setDrawsBackground_(False)
-        self.device.setEditable_(False)
-        self.device.setAlignment_(NSLeftTextAlignment)
-        self.device.cell().setLineBreakMode_(NSLineBreakByTruncatingTail)
-        self.device.setFont_(NSFont.systemFontOfSize_(11))
-        self.device.cell().setBackgroundStyle_(NSBackgroundStyleRaised)
-        v.addSubview_(self.device)
-
-        # Like iTunes 10's AirPlay button: pick which Spotify Connect device plays.
-        self.airplay = NSButton.alloc().initWithFrame_(NSMakeRect(428, 10, 38, 25))
-        self.airplay.setBezelStyle_(NSTexturedRoundedBezelStyle)
-        self.airplay.setImage_(icons.template("airplay"))
-        self.airplay.setImagePosition_(NSImageOnly)
-        self.airplay.setToolTip_(u"Choose where Spotify plays")
-        self.airplay.setTarget_(self)
-        self.airplay.setAction_("chooseDevice:")
-        v.addSubview_(self.airplay)
-
-        self.loginButton = NSButton.alloc().initWithFrame_(NSMakeRect(220, 38, 196, 32))
-        self.loginButton.setBezelStyle_(NSRoundedBezelStyle)
-        self.loginButton.setTitle_(u"Log In to Spotify…")
-        self.loginButton.setTarget_(self)
-        self.loginButton.setAction_("logIn:")
-        v.addSubview_(self.loginButton)
-
-        self.window = w
-        w.makeKeyAndOrderFront_(None)
-
-    # ---- connection & state ----------------------------------------------------------------
+    # ---- connection & state ------------------------------------------------------------------------
     def clientID(self):
         return (self.defaults.stringForKey_("clientID") or u"").strip() or CLIENT_ID
 
     def connect(self):
         self.client = spotify.Spotify(self.clientID())
-        self.showLoggedIn(self.client.logged_in)
+        self.showLoggedIn(self.loggedIn())
+
+    def loggedIn(self):
+        return self.fake or bool(self.client and self.client.logged_in)
+
+    def item(self):
+        return (self.state or {}).get("item")
+
+    def isPlaying(self):
+        return bool(self.state and self.state.get("is_playing") and self.item())
+
+    def volume(self):
+        return ((self.state or {}).get("device") or {}).get("volume_percent")
 
     def showLoggedIn(self, logged_in):
-        for control in (self.prevButton, self.playButton, self.nextButton, self.volume, self.airplay):
-            control.setHidden_(not logged_in)
-        self.loginButton.setHidden_(logged_in)
-        if not logged_in:
-            self.lcd.line1 = APP_NAME
-            self.lcd.line2 = u"Log in with your Spotify Premium account"
-            if self.client and self.client.keychain_error:
-                self.lcd.line2 = u"Open Kassett from the Dock to log in"
-            self.lcd.duration = 0
-            self.lcd.setNeedsDisplay_(True)
-            self.device.setStringValue_(u"")
-            self.art.setImage_(NSImage.imageNamed_(NSImageNameApplicationIcon))
+        self.deck.showLoggedIn(logged_in)
+        if logged_in:
+            self.showNothing()
+            return
+        self.state, self.item_id = None, None
+        hint = u"Log in with your Spotify Premium account"
+        if self.client and self.client.keychain_error:
+            hint = u"Open Kassett from the Dock to log in"
+        self.deck.setTape(APP_NAME, hint)
+        self.deck.setArt(None, u"", True)
+        self.deck.setPlaying(False, False)
+        self.deck.setPosition(0, 0, False)
+        self.deck.setStatus(u"Not logged in to Spotify")
+        self.mini.show(APP_NAME, hint, 0, False, False)
+
+    def showNothing(self):
+        self.item_id = None
+        self.deck.setTape(u"Nothing playing", u"Pick a song in the library, or start Spotify on a device")
+        self.deck.setArt(None, u"", True)
+        self.deck.setPlaying(False, False)
+        self.deck.setPosition(0, 0, False)
+        self.deck.setVolume(None, False)
+        self.mini.show(u"Nothing playing", u"Kassett", 0, False, False)
+        dev = (self.state or {}).get("device")
+        if dev:
+            self.deck.setStatus(u"Paused on %s" % dev.get("name"), glyphs.device_glyph(dev.get("type")))
+        else:
+            self.deck.setStatus(u"Spotify isn’t playing on any device right now")
+        if self.library:
+            self.library.showState(self.state, 0)
+
+    def estimatedProgress(self):
+        item = self.item()
+        if not item:
+            return 0
+        p = self.state.get("progress_ms") or 0
+        if self.state.get("is_playing"):
+            p += (time.time() - self.fetched_at) * 1000
+        return min(p, item.get("duration_ms") or p)
 
     def tick_(self, timer):
         self.ticks += 1
-        if self.state and self.state.get("is_playing"):
-            self.lcd.progress = min(self.state["progress_ms"] + (time.time() - self.fetched_at) * 1000,
-                                    self.lcd.duration)
-            self.lcd.setNeedsDisplay_(True)
+        item = self.item()
+        if item and self.isPlaying():
+            progress = self.estimatedProgress()
+            self.showPosition(progress, False)
+            if self.fake and progress >= item["duration_ms"]:
+                self.state["progress_ms"], self.fetched_at = 0, time.time()
+            elif progress >= item.get("duration_ms", 0) - 400 and self.ticks % 2 == 0:
+                self.poll()
+        if self.flash_text and time.time() > self.flash_until:
+            self.flash_text = None
+            self.applyStatus()
         if self.ticks % POLL_EVERY == 1 or timer is None:
             self.poll()
 
     def poll(self):
-        if self.busy or not (self.client and self.client.logged_in):
+        if self.fake or self.busy or not (self.client and self.client.logged_in):
             return
         self.busy = True
-        cocoa.in_background(self.client.now_playing, self.gotState)
-
-    def gotState(self, state, error):
-        self.busy = False
-        if error:
-            self.device.setStringValue_(u"⚠ %s" % error)
-            return
-        self.state, self.fetched_at = state, time.time()
-        item = (state or {}).get("item")
-        if not item:
-            self.lcd.line1, self.lcd.line2, self.lcd.duration = u"Nothing playing", u"Start Spotify on your phone or speaker", 0
-            self.device.setStringValue_(u"")
-            self.lcd.setNeedsDisplay_(True)
-            return
-        artists = u", ".join(a["name"] for a in item.get("artists", []))
-        album = (item.get("album") or {}).get("name", u"")
-        self.lcd.line1 = item.get("name", u"")
-        self.lcd.line2 = u"%s — %s" % (artists, album) if album else artists
-        self.lcd.duration = item.get("duration_ms", 0)
-        self.lcd.progress = state.get("progress_ms", 0)
-        self.lcd.setNeedsDisplay_(True)
-        self.playButton.setTitle_(u"❚❚" if state.get("is_playing") else u"▶")
-        dev = state.get("device") or {}
-        if dev.get("volume_percent") is not None:
-            self.volume.setIntValue_(dev["volume_percent"])
-        self.device.setStringValue_(u"Playing on %s" % dev.get("name", u"Spotify"))
-        if not self.devices or self.ticks % (POLL_EVERY * 5) == 1:
-            self.refreshDevices()
-        images = (item.get("album") or {}).get("images") or []  # largest first: 640, 300, 64 px
-        url = images[1]["url"] if len(images) > 1 else (images[0]["url"] if images else None)
-        if url and url != self.art_url:
-            self.art_url = url
-            path = os.path.join(tempfile.gettempdir(), "kassett-art.jpg")
-            cocoa.in_background(lambda: http.request("GET", url, output_path=path) and path, self.gotArt)
-
-    def gotArt(self, path, error):
-        if path and not error:
-            self.art.setImage_(NSImage.alloc().initWithContentsOfFile_(path))
-
-    # ---- controls ----------------------------------------------------------------------------
-    def command(self, fn, arg=None):
-        def done(_, error):
-            if error:
-                self.device.setStringValue_(u"⚠ %s" % error)
-            self.performSelector_withObject_afterDelay_("pollNow:", None, 0.6)
-        cocoa.in_background(lambda: fn() if arg is None else fn(arg), done)
+        serial = self.serial
+        cocoa.in_background(self.client.now_playing, lambda state, error: self.gotState(state, error, serial))
 
     def pollNow_(self, _):
         self.poll()
 
-    # ---- Spotify Connect devices -------------------------------------------------------------
+    def gotState(self, state, error, serial):
+        self.busy = False
+        if serial != self.serial:
+            return  # a command went out while we were asking; this answer may predate it
+        if error:
+            self.flash(unicode(error))
+            return
+        prev_id, prev_progress = self.item_id, self.estimatedProgress()
+        self.state, self.fetched_at = state, time.time()
+        self.applyState(prev_id, prev_progress)
+
+    def applyState(self, prev_id, prev_progress):
+        item = self.item()
+        if not item:
+            self.showNothing()
+            return
+        info = describe(item)
+        progress = self.estimatedProgress()
+        changed = item.get("id") != prev_id
+        jumped = changed or abs(progress - prev_progress) > 2500
+        self.item_id = item.get("id")
+        self.deck.setTape(info["title"], subtitle(info))
+        self.deck.setPlaying(self.isPlaying(), True)
+        self.showPosition(progress, jumped)
+        dev = self.state.get("device") or {}
+        self.deck.setVolume(dev.get("volume_percent"), dev.get("supports_volume", True))
+        self.applyStatus()
+        self.showArt(info)
+        self.updateContext(item)
+        if self.library:
+            self.library.showState(self.state, progress)
+        if changed and self.upnext.isShown():
+            self.refreshQueue()
+        if not self.devices or self.ticks % (POLL_EVERY * 5) == 1:
+            self.refreshDevices()
+
+    def showPosition(self, progress, jumped):
+        item = self.item() or {}
+        duration = item.get("duration_ms") or 0
+        self.deck.setPosition(progress, duration, jumped)
+        info = describe(item) if item else {"title": u"", "artist": u""}
+        self.mini.show(info["title"], info["artist"], float(progress) / duration if duration else 0,
+                       self.isPlaying(), bool(item))
+        if self.library:
+            self.library.showProgress(progress, duration)
+
+    def applyStatus(self):
+        if self.flash_text:
+            self.deck.setStatus(self.flash_text, None)
+            return
+        dev = (self.state or {}).get("device") or {}
+        if not self.loggedIn():
+            self.deck.setStatus(u"Not logged in to Spotify")
+        elif dev:
+            verb = u"Playing on" if self.isPlaying() else u"Paused on"
+            self.deck.setStatus(u"%s %s" % (verb, dev.get("name") or u"Spotify"), glyphs.device_glyph(dev.get("type")))
+
+    def flash(self, text):
+        self.flash_text, self.flash_until = u"⚠ " + text, time.time() + FLASH
+        self.applyStatus()
+
+    def showArt(self, info):
+        url = art.large(info["images"])
+        self.art_url = url
+        name = info["album"] or info["title"]
+        img = art.shared().image(url, lambda: url == self.art_url and self.showArt(info))
+        self.deck.setArt(img, name, False)
+
+    def updateContext(self, item):
+        ctx = (self.state or {}).get("context") or {}
+        uri = ctx.get("uri")
+        if uri == self.context_uri:
+            return
+        self.context_uri = uri
+        kind = ctx.get("type")
+        name = None
+        if not uri:
+            name = u""
+        elif ":collection" in uri:
+            name = u"Liked Songs"
+        elif kind == "album":
+            name = (item.get("album") or {}).get("name")
+        elif kind == "show":
+            name = (item.get("show") or {}).get("name")
+        name = self.context_names.get(uri, name)
+        if name is not None:
+            self.context_name = name
+            return
+        self.context_name = u""
+        if self.fake:
+            return
+        object_id = uri.split(":")[-1]
+        fetch = self.client.playlist if kind == "playlist" else self.client.artist if kind == "artist" else None
+        if fetch is None:
+            return
+
+        def done(obj, error):
+            if obj and not error:
+                self.context_names[uri] = obj.get("name") or u""
+                if self.context_uri == uri:
+                    self.context_name = self.context_names[uri]
+        cocoa.in_background(lambda: fetch(object_id), done)
+
+    # ---- controls ----------------------------------------------------------------------------------
+    def send(self, work, poll_after):
+        """Run a player command in the background, then ask Spotify for the new state."""
+        self.serial += 1
+        if self.fake:
+            return
+
+        def done(_, error):
+            if error:
+                self.flash(unicode(error))
+            self.performSelector_withObject_afterDelay_("pollNow:", None, poll_after)
+        cocoa.in_background(work, done)
+
+    def setLocalPlaying(self, playing):
+        if self.state and self.item():
+            self.state["progress_ms"], self.fetched_at = self.estimatedProgress(), time.time()
+            self.state["is_playing"] = playing
+            self.deck.setPlaying(playing, True)
+            self.showPosition(self.state["progress_ms"], False)
+            self.applyStatus()
+
+    def play_(self, sender):
+        if not self.loggedIn():
+            return self.logIn_(sender)
+        if self.isPlaying():
+            self.deck.setPlaying(True, True)  # keep the latched key down
+            return
+        self.setLocalPlaying(True)
+        self.send(self.client.play, 0.8)
+
+    def pause_(self, sender):
+        if not self.isPlaying():
+            self.deck.setPlaying(False, bool(self.item()))
+            return
+        self.setLocalPlaying(False)
+        self.send(self.client.pause, 0.8)
+
+    def playPause_(self, sender):
+        (self.pause_ if self.isPlaying() else self.play_)(sender)
+
+    def skip(self, work):
+        if self.state and self.item():
+            self.state["progress_ms"], self.fetched_at = 0, time.time()
+            self.showPosition(0, True)
+        self.send(work, 0.9)
+
+    def next_(self, sender):
+        self.skip(self.client.next)
+
+    def previous_(self, sender):
+        self.skip(self.client.previous)
+
+    def seekTo(self, ms):
+        item = self.item()
+        if not item:
+            return
+        ms = max(0, min(ms, item.get("duration_ms", 0) - 1000))
+        self.state["progress_ms"], self.fetched_at = ms, time.time()
+        self.showPosition(ms, True)
+        self.send(lambda: self.client.seek(ms), 0.8)
+
+    def rewind_(self, sender):
+        self.seekTo(self.estimatedProgress() - SEEK_STEP)
+
+    def fastForward_(self, sender):
+        self.seekTo(self.estimatedProgress() + SEEK_STEP)
+
+    def seekToFraction(self, p):
+        item = self.item()
+        if item:
+            self.seekTo(p * item.get("duration_ms", 0))
+
+    def volumeChanged(self, volume, final):
+        dev = (self.state or {}).get("device")
+        if not dev:
+            return
+        dev["volume_percent"] = volume
+        now = time.time()
+        if final or now - self.volume_sent > 0.4:
+            self.volume_sent = now
+            self.send(lambda: self.client.set_volume(volume), 1.5)
+
+    def volumeUp_(self, sender):
+        if self.volume() is not None:
+            self.deck.knob.change(self.volume() + 8, True)
+
+    def volumeDown_(self, sender):
+        if self.volume() is not None:
+            self.deck.knob.change(self.volume() - 8, True)
+
+    def handleKey(self, event):
+        """Keys the deck and the library share: space plays or pauses, arrows skip."""
+        chars = event.charactersIgnoringModifiers()
+        mods = event.modifierFlags() & (NSCommandKeyMask | NSAlternateKeyMask | NSControlKeyMask)
+        if mods or not chars:
+            return False
+        if chars == u" ":
+            self.playPause_(None)
+        elif chars == NSRightArrowFunctionKey and self.item():
+            self.next_(None)
+        elif chars == NSLeftArrowFunctionKey and self.item():
+            self.previous_(None)
+        else:
+            return False
+        return True
+
+    def setShell_(self, sender):
+        self.deck.cassette.shell = sender.representedObject()
+        self.deck.cassette.setNeedsDisplay_(True)
+        self.defaults.setObject_forKey_(sender.representedObject(), "CassetteShell")
+
+    # ---- windows -----------------------------------------------------------------------------------
+    def showLibrary_(self, sender):
+        if self.library is None:
+            try:
+                import library
+            except ImportError:  # the library browser is still being built (see ROADMAP.md, WS-1)
+                self.flash(u"The library browser isn\u2019t in this build yet.")
+                return
+            self.library = library.Library.alloc().initWithApp_(self)
+            self.library.showState(self.state, self.estimatedProgress())
+        self.library.window.makeKeyAndOrderFront_(None)
+
+    def showDeck_(self, sender):
+        if self.mini.window.isVisible():
+            self.mini.window.orderOut_(None)
+        self.defaults.setBool_forKey_(False, "MiniMode")
+        self.deck.window.makeKeyAndOrderFront_(None)
+        self.deck.ensureTimer()
+
+    def toggleMini_(self, sender):
+        if self.mini.window.isVisible():
+            return self.showDeck_(sender)
+        self.upnext.popover.close()
+        self.deck.window.orderOut_(None)
+        self.defaults.setBool_forKey_(True, "MiniMode")
+        self.mini.window.makeKeyAndOrderFront_(None)
+        self.showPosition(self.estimatedProgress(), False)
+
+    def miniClosed(self):
+        self.defaults.setBool_forKey_(False, "MiniMode")
+
+    def applicationShouldHandleReopen_hasVisibleWindows_(self, app, visible):
+        if not visible:
+            self.showDeck_(None)
+        return True
+
+    def applicationShouldTerminateAfterLastWindowClosed_(self, app):
+        return True
+
+    # ---- Up Next -----------------------------------------------------------------------------------
+    def showUpNext_(self, sender):
+        if self.mini.window.isVisible():
+            self.showDeck_(sender)
+        self.upnext.toggleFrom_(self.deck.upNextButton)
+
+    def refreshQueue(self):
+        if self.fake:
+            self.upnext.show(self.item(), self.context_name or u"The Lion’s Roar", [], None)
+            return
+
+        def done(q, error):
+            q = q or {}
+            current = q.get("currently_playing") or self.item()
+            self.upnext.show(current, self.context_name, [t for t in q.get("queue") or [] if t], error and unicode(error))
+        cocoa.in_background(self.client.queue, done)
+
+    def addToQueue(self, uri, name):
+        def done(_, error):
+            if error:
+                self.flash(unicode(error))
+            elif self.upnext.isShown():
+                self.refreshQueue()
+        cocoa.in_background(lambda: self.client.add_to_queue(uri), done)
+
+    # ---- Spotify Connect devices -------------------------------------------------------------------
     def refreshDevices(self):
+        if self.fake:
+            return
+
         def done(devices, error):
             if not error:
                 self.devices = devices or []
@@ -260,57 +531,51 @@ class AppDelegate(NSObject):
     def chooseDevice_(self, sender):
         menu = NSMenu.alloc().initWithTitle_(u"Devices")
         menu.setAutoenablesItems_(False)
-        if not self.devices:
-            note = menu.addItemWithTitle_action_keyEquivalent_(u"No devices found", None, "")
-            note.setEnabled_(False)
-            hint = menu.addItemWithTitle_action_keyEquivalent_(u"Open Spotify on your phone or speaker", None, "")
-            hint.setEnabled_(False)
+        head = menu.addItemWithTitle_action_keyEquivalent_(u"Play On", None, "")
+        head.setEnabled_(False)
+        para = NSMutableParagraphStyle.alloc().init()
+        para.setTabStops_([NSTextTab.alloc().initWithType_location_(NSRightTabStopType, 210)])
         for d in self.devices:
-            item = menu.addItemWithTitle_action_keyEquivalent_(d.get("name") or u"Device", "transferTo:", "")
+            name = d.get("name") or u"Device"
+            item = menu.addItemWithTitle_action_keyEquivalent_(name, "transferTo:", "")
+            if d.get("is_restricted"):
+                item.setAttributedTitle_(NSAttributedString.alloc().initWithString_attributes_(
+                    name + u"\tbusy", {NSFontAttributeName: NSFont.menuFontOfSize_(14), NSParagraphStyleAttributeName: para}))
             item.setTarget_(self)
-            item.setRepresentedObject_(d["id"])
+            item.setRepresentedObject_(d.get("id"))
             item.setState_(NSOnState if d.get("is_active") else NSOffState)
-            image = icons.template(DEVICE_ICONS.get(d.get("type"), "speaker")).copy()
-            image.setSize_(NSMakeSize(16, 16))
-            item.setImage_(image)
+            item.setImage_(glyphs.image(glyphs.device_glyph(d.get("type")), 16))
             item.setEnabled_(bool(d.get("id")) and not d.get("is_restricted"))
-        menu.popUpMenuPositioningItem_atLocation_inView_(None, NSMakePoint(0, sender.frame().size.height + 3), sender)
+            item.setIndentationLevel_(0)
+        if not self.devices:
+            none = menu.addItemWithTitle_action_keyEquivalent_(u"No devices found", None, "")
+            none.setEnabled_(False)
+        menu.addItem_(NSMenuItem.separatorItem())
+        hint = menu.addItemWithTitle_action_keyEquivalent_(u"Open Spotify on a device to add it", None, "")
+        hint.setEnabled_(False)
+        height = menu.size().height
+        where = NSMakePoint(0, -height - 4) if sender.isFlipped() else NSMakePoint(0, sender.frame().size.height + height + 4)
+        menu.popUpMenuPositioningItem_atLocation_inView_(None, where, sender)
         self.refreshDevices()
 
     def transferTo_(self, sender):
-        device_id, name = sender.representedObject(), sender.title()
+        device_id, name = sender.representedObject(), sender.title().split(u"\t")[0]
         play = self.state is None or bool(self.state.get("is_playing"))
-        self.device.setStringValue_(u"Switching to %s\u2026" % name)
+        self.deck.setStatus(u"Switching to %s…" % name, None)
 
         def done(_, error):
             if error:
-                self.device.setStringValue_(u"\u26a0 %s" % error)
+                self.flash(unicode(error))
             self.refreshDevices()
             self.performSelector_withObject_afterDelay_("pollNow:", None, 1.0)
-
+        self.serial += 1
         cocoa.in_background(lambda: self.client.transfer(device_id, play), done)
 
-    def playPause_(self, sender):
-        playing = bool(self.state and self.state.get("is_playing"))
-        self.playButton.setTitle_(u"▶" if playing else u"❚❚")
-        if self.state:
-            self.state["is_playing"] = not playing
-            self.state["progress_ms"], self.fetched_at = self.lcd.progress, time.time()
-        self.command(self.client.pause if playing else self.client.play)
-
-    def next_(self, sender):
-        self.command(self.client.next)
-
-    def previous_(self, sender):
-        self.command(self.client.previous)
-
-    def setVolume_(self, sender):
-        self.command(self.client.set_volume, sender.intValue())
-
+    # ---- login -------------------------------------------------------------------------------------
     def logIn_(self, sender):
         self.connect()
-        self.lcd.line1, self.lcd.line2 = u"Logging in…", u"Finish in the browser window"
-        self.lcd.setNeedsDisplay_(True)
+        self.deck.setTape(u"Logging in…", u"Finish in the browser window")
+        self.mini.show(u"Logging in…", u"Finish in the browser window", 0, False, False)
 
         def finished(error):
             cocoa.on_main(lambda: self.loginFinished(error))
@@ -320,15 +585,16 @@ class AppDelegate(NSObject):
     def loginFinished(self, error):
         if error:
             self.showLoggedIn(False)
-            self.lcd.line2 = u"Login failed: %s" % error
-            self.lcd.setNeedsDisplay_(True)
+            self.deck.setTape(APP_NAME, u"Login failed: %s" % error)
         else:
             self.showLoggedIn(True)
             NSApp.activateIgnoringOtherApps_(True)
             self.poll()
+            if self.library:
+                self.library.reload()
         self.updateAccount()
 
-    # ---- preferences: just the Spotify account ------------------------------------------------
+    # ---- preferences: just the Spotify account -----------------------------------------------------
     def showPreferences_(self, sender):
         if not getattr(self, "prefs", None):
             p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -343,7 +609,8 @@ class AppDelegate(NSObject):
             self.avatar.setImageScaling_(NSImageScaleProportionallyUpOrDown)
             v.addSubview_(self.avatar)
             self.nameLabel = self.label(v, NSMakeRect(112, 114, 190, 20), NSFont.boldSystemFontOfSize_(14))
-            self.accountLabel = self.label(v, NSMakeRect(112, 94, 190, 17), NSFont.systemFontOfSize_(11))
+            self.accountLabel = self.label(v, NSMakeRect(112, 80, 190, 32), NSFont.systemFontOfSize_(11))
+            self.accountLabel.cell().setLineBreakMode_(NSLineBreakByWordWrapping)
             self.accountLabel.setTextColor_(NSColor.grayColor())
             self.accountButton = NSButton.alloc().initWithFrame_(NSMakeRect(304, 92, 112, 32))
             self.accountButton.setBezelStyle_(NSRoundedBezelStyle)
@@ -351,9 +618,10 @@ class AppDelegate(NSObject):
             self.accountButton.setAction_("accountAction:")
             v.addSubview_(self.accountButton)
             note = self.label(v, NSMakeRect(18, 12, 404, 34), NSFont.systemFontOfSize_(11))
+            note.cell().setLineBreakMode_(NSLineBreakByWordWrapping)
             note.setTextColor_(NSColor.grayColor())
-            note.setStringValue_(u"Kassett plays music on your phone, speakers and computers through "
-                                 u"Spotify Connect. Your login stays in this Mac\u2019s login keychain.")
+            note.setStringValue_(u"Kassett plays music on your phone, speakers and computers through Spotify "
+                                 u"Connect, which needs Premium. Your login stays in this Mac’s login keychain.")
             self.prefs = p
         self.updateAccount()
         self.prefs.center()
@@ -376,23 +644,23 @@ class AppDelegate(NSObject):
         logged_in = bool(self.client and self.client.logged_in)
         if not logged_in:
             self.nameLabel.setStringValue_(u"Not logged in")
-            self.accountLabel.setStringValue_(u"Use your Spotify Premium account")
-            self.accountButton.setTitle_(u"Log In\u2026")
+            self.accountLabel.setStringValue_(u"Log in with your Spotify Premium account.")
+            self.accountButton.setTitle_(u"Log In…")
             self.avatar.setImage_(NSImage.imageNamed_(NSImageNameUser))
             return
         self.accountButton.setTitle_(u"Log Out")
         if self.profile is None:
             self.nameLabel.setStringValue_(u"Logged in")
-            self.accountLabel.setStringValue_(u"Loading your profile\u2026")
+            self.accountLabel.setStringValue_(u"Loading your profile…")
             self.avatar.setImage_(NSImage.imageNamed_(NSImageNameUser))
             cocoa.in_background(self.loadProfile, self.gotProfile)
             return
         p = self.profile
         self.nameLabel.setStringValue_(p.get("display_name") or p.get("id") or u"Spotify user")
-        plan = u"Spotify Premium" if p.get("product") == "premium" else u"Spotify Free (Premium needed)"
         if self.client.missing_scopes():
-            plan = u"Log out and in again to enable new features"
-        self.accountLabel.setStringValue_(plan)
+            self.accountLabel.setStringValue_(u"Log out and in again to let Kassett follow artists for you.")
+        else:
+            self.accountLabel.setStringValue_(u"Connected to Spotify")
         if p.get("avatar_path"):
             self.avatar.setImage_(NSImage.alloc().initWithContentsOfFile_(p["avatar_path"]))
 
@@ -400,8 +668,10 @@ class AppDelegate(NSObject):
         p = self.client.me() or {}
         images = p.get("images") or []
         if images:
-            path = os.path.join(tempfile.gettempdir(), "kassett-avatar.jpg")
-            http.request("GET", images[0]["url"], output_path=path)
+            if not os.path.isdir(SUPPORT):
+                os.makedirs(SUPPORT)
+            path = os.path.join(SUPPORT, "avatar.jpg")
+            http.request("GET", art.best_url(images, 72), output_path=path)
             p["avatar_path"] = path
         return p
 
@@ -421,12 +691,29 @@ class AppDelegate(NSObject):
         self.state, self.profile, self.devices = None, None, []
         self.showLoggedIn(False)
         self.updateAccount()
+        if self.library:
+            self.library.reload()
 
-    def applicationShouldTerminateAfterLastWindowClosed_(self, app):
-        return True
+    # ---- hidden hooks for checking screens from the dev machine ------------------------------------
+    def debugOpen_(self, _):
+        """`defaults write page.zepto.kassett DebugOpenView <view>` opens a screen at launch:
+        mini, upnext, library, or library:<liked|albums|artists|playlist|album|artist|search:text>."""
+        view = self.defaults.stringForKey_("DebugOpenView")
+        if not view:
+            return
+        if view == "mini":
+            self.toggleMini_(None)
+        elif view == "upnext":
+            self.upnext.popover.setBehavior_(upnext.POPOVER_APP_DEFINED)
+            self.showUpNext_(None)
+        elif view.startswith("library"):
+            self.showLibrary_(None)
+            if ":" in view:
+                self.library.debugOpen(view.split(":", 1)[1])
 
 
 if __name__ == "__main__":
+    objc.setVerbose(True)  # full tracebacks in the log for errors inside Cocoa callbacks
     app = NSApplication.sharedApplication()
     delegate = AppDelegate.alloc().init()
     app.setDelegate_(delegate)
