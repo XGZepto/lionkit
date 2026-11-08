@@ -4,7 +4,9 @@ track lists, album and artist grids, the artist page and search, drawn after des
 
 Lists load 50 rows at a time as you scroll, and only small fields are kept from each item."""
 import HTMLParser
+import random
 import re
+import time
 
 from AppKit import *  # noqa: F401,F403
 from Foundation import *  # noqa: F401,F403
@@ -14,6 +16,7 @@ import art
 import glyphs
 import paint
 from paint import hexc, white
+from deck import INK
 
 SIDEBAR = 210
 BAR = 26
@@ -109,7 +112,7 @@ class CanvasView(LibraryFlipped):
     def initWithFrame_(self, frame):
         self = super(CanvasView, self).initWithFrame_(frame)
         if self:
-            self.builder, self.nearEnd = None, None
+            self.builder, self.nearEnd, self.backdrop = None, None, None
             self.items, self.selected, self.width = [], None, 0
         return self
 
@@ -146,7 +149,10 @@ class CanvasView(LibraryFlipped):
         self.scrollPoint_(NSMakePoint(0, 0))
 
     def drawRect_(self, rect):
-        paint.fill(rect, "#ffffff")
+        if self.backdrop:
+            self.backdrop(rect)
+        else:
+            paint.fill(rect, "#ffffff")
         for it in self.items:
             if NSIntersectsRect(rect, it["rect"]):
                 it["draw"](it, it is self.selected)
@@ -209,6 +215,136 @@ def draw_cover(rect, url, name, canvas, round_=False, caption=True, shadow=True,
                      3 if rect.size.width > 90 else 2)
     elif small:
         paint.stroke(NSBezierPath.bezierPathWithRect_(NSInsetRect(rect, -0.5, -0.5)), white(0, 0.2))
+
+
+CASE_RATIO = 109 / 69.0      # a Norelco cassette case standing upright, 69 x 109 mm
+_bands = {}
+
+
+def band_color(url, img):
+    """The J-card's printed band takes the cover's average colour, darkened so white type reads."""
+    if url in _bands:
+        return _bands[url]
+    rep = NSBitmapImageRep.alloc().initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel_(
+        None, 1, 1, 8, 4, True, False, NSCalibratedRGBColorSpace, 0, 0)
+    NSGraphicsContext.saveGraphicsState()
+    ctx = NSGraphicsContext.graphicsContextWithBitmapImageRep_(rep)
+    NSGraphicsContext.setCurrentContext_(ctx)
+    ctx.setImageInterpolation_(NSImageInterpolationHigh)
+    img.drawInRect_fromRect_operation_fraction_(NSMakeRect(0, 0, 1, 1), NSZeroRect, NSCompositeCopy, 1.0)
+    NSGraphicsContext.restoreGraphicsState()
+    color = rep.colorAtX_y_(0, 0).blendedColorWithFraction_ofColor_(0.38, NSColor.blackColor())
+    _bands[url] = color
+    return color
+
+
+def draw_case(r, canvas, image=None, title=u"", artist=u"", note=u"", kind="album"):
+    """A cassette in its clear plastic case, seen from the front. Albums show a printed J-card (the
+    square cover above a band with the artist and title); mixtapes (playlists, Liked Songs) have a
+    cream card with the name written in marker."""
+    x, y, w, h = r.origin.x, r.origin.y, r.size.width, r.size.height
+    case = paint.rounded(r, 3)
+    paint.with_shadow(paint.shadow(3, 5, white(0, 0.5)), lambda: paint.fill(case, "#1c1c1c"))
+    card = NSMakeRect(x + 5, y + 4, w - 9, h - 8)
+    art = NSMakeRect(card.origin.x, card.origin.y, card.size.width, card.size.width)
+    band = NSMakeRect(card.origin.x, art.origin.y + art.size.height, card.size.width, card.size.height - art.size.height)
+    small = max(6.0, w / 16.0)
+    img = art_image(image, canvas, NSInsetRect(r, -8, -8)) if image else None
+    if kind == "album":
+        if img is not None:
+            paint.image(img, art)
+            paint.fill(band, band_color(image, img))
+        else:
+            draw_cover_placeholder(art, title)
+            c1 = art_palette(title)
+            paint.fill(band, paint.hexc(c1).blendedColorWithFraction_ofColor_(0.38, NSColor.blackColor()))
+        tx, tw = band.origin.x + 6, band.size.width - 12
+        paint.text(artist.upper(), NSMakeRect(tx, band.origin.y + 6, tw, small + 4), paint.font("Helvetica-Bold", small, True),
+                   white(1, 0.78), kern=0.8)
+        f = paint.font("Helvetica-Bold", small * 1.45, True)
+        paint.text(title, NSMakeRect(tx, band.origin.y + 8 + small, tw, band.size.height - small - 22), f, white(1), truncate=False)
+        paint.text(note or u"STEREO", NSMakeRect(tx, band.origin.y + band.size.height - small - 6, tw, small + 3),
+                   paint.font("Helvetica-Bold", small * 0.9, True), white(1, 0.6), NSRightTextAlignment, kern=1)
+    else:
+        paint.fill(card, "#f8f4e8", "#ece5d2")
+        if kind == "liked":
+            paint.fill(art, ("#8fb6ee", 0), ("#3a63c4", 0.6), ("#2a3f8f", 1), angle=45)
+            glyphs.draw("heart", NSInsetRect(art, art.size.width * 0.3, art.size.width * 0.3), white(1))
+        elif img is not None:
+            paint.image(img, art)
+        else:
+            for ly in range(int(art.origin.y + 14), int(art.origin.y + art.size.height), 12):
+                paint.fill(NSMakeRect(art.origin.x + 6, ly, art.size.width - 12, 1), paint.hexc("#466eaa", 0.25))
+        paint.fill(NSMakeRect(band.origin.x, band.origin.y, band.size.width, 1), white(0, 0.12))
+        for ly in range(int(band.origin.y + small * 2.6), int(band.origin.y + band.size.height - 4), int(small * 2.2)):
+            paint.fill(NSMakeRect(band.origin.x + 5, ly, band.size.width - 10, 1), paint.hexc("#466eaa", 0.25))
+        marker = paint.font("MarkerFelt-Wide", small * 2.0)
+        paint.text(title, NSMakeRect(band.origin.x + 6, band.origin.y + small * 2.6 - marker.ascender() - 1,
+                                     band.size.width - 12, small * 2.6 + 4), marker, INK)
+        paint.text(note, NSMakeRect(band.origin.x + 6, band.origin.y + band.size.height - small - 6, band.size.width - 12,
+                                    small + 3), paint.font("Helvetica-Bold", small * 0.9, True), "#8a8170", kern=1)
+    paint.fill(NSMakeRect(x + 5, y + 4, 3, h - 8), white(0, 0.18))          # where the J-card folds round the spine
+
+    def plastic():
+        paint.fill(r, white(1, 0.10), white(1, 0.02))
+        paint.gradient((white(1, 0.30), 0), (white(1, 0.06), 0.42), (white(1, 0), 0.43), (white(1, 0.04), 0.7),
+                       (white(1, 0), 1)).drawInRect_angle_(r, 70)
+        for i in range(3):                                                    # the grip ridges on the opening edge
+            paint.fill(NSMakeRect(x + w - 4 + i, y + h * 0.3, 1, h * 0.4), white(1, 0.3) if i % 2 == 0 else white(0, 0.2))
+    paint.clipped(case, plastic)
+    for hy in (y + 8, y + h - 20):                                           # hinge pins on the spine side
+        paint.fill(paint.rounded(NSMakeRect(x + 1, hy, 3, 12), 1.5), white(1, 0.4))
+    paint.stroke(paint.rounded(NSInsetRect(r, 0.5, 0.5), 2.5), white(1, 0.45), 1)
+    paint.stroke(paint.rounded(NSInsetRect(r, -0.5, -0.5), 3.5), white(0, 0.45), 1)
+
+
+def art_image(url, canvas, dirty):
+    return art.shared().image(url, lambda: canvas.setNeedsDisplayInRect_(dirty))
+
+
+def art_palette(name):
+    return art.placeholder(name)[1]
+
+
+def draw_cover_placeholder(rect, name):
+    art.draw_placeholder(rect, name, name.upper(), caption_size=max(8, int(rect.size.width / 10)))
+
+
+# ---- the shelf -----------------------------------------------------------------------------------------
+_wall = {}
+
+
+def wall_color():
+    """Dark walnut for the wall behind the shelves, as a pattern so it tiles cheaply."""
+    if "c" not in _wall:
+        def grain():
+            paint.fill(NSMakeRect(0, 0, 256, 256), "#3d2716")
+            rnd = random.Random(3)
+            for _ in range(140):
+                x = rnd.uniform(0, 256)
+                paint.fill(NSMakeRect(x, 0, rnd.uniform(0.5, 2.5), 256),
+                           white(1, rnd.uniform(0.01, 0.05)) if rnd.random() < 0.5 else white(0, rnd.uniform(0.03, 0.12)))
+        img = NSImage.alloc().initWithSize_(NSMakeSize(256, 256))
+        img.lockFocus()
+        grain()
+        img.unlockFocus()
+        _wall["c"] = NSColor.colorWithPatternImage_(img)
+    return _wall["c"]
+
+
+def draw_wall(rect):
+    NSGraphicsContext.currentContext().setPatternPhase_(NSMakePoint(0, 0))
+    wall_color().set()
+    NSBezierPath.fillRect_(rect)
+
+
+def draw_board(width, y):
+    """A shelf board: its lit top surface, its front edge and the shadow it casts on the wall."""
+    paint.fill(NSMakeRect(0, y, width, 9), "#b37c4a", "#9a6537")
+    paint.fill(NSMakeRect(0, y, width, 1), white(1, 0.35))
+    paint.fill(NSMakeRect(0, y + 9, width, 13), "#7a4c28", "#55331a")
+    paint.fill(NSMakeRect(0, y + 9, width, 1), white(1, 0.18))
+    paint.fill(NSMakeRect(0, y + 22, width, 12), white(0, 0.55), white(0, 0))
 
 
 def draw_pill(rect, title, blue, pressed=False):
@@ -308,20 +444,18 @@ class ListHeader(LibraryFlipped):
         self = super(ListHeader, self).initWithFrame_(frame)
         if self:
             self.kind, self.title, self.meta, self.desc, self.image, self.heart = u"", u"", u"", u"", None, False
+            self.artist = u""
         return self
 
     def drawRect_(self, rect):
         b = self.bounds()
         paint.fill(b, "#fbfbfb", "#ebebeb")
         paint.fill(NSMakeRect(0, b.size.height - 1, b.size.width, 1), "#c9c9c9")
-        cover = NSMakeRect(22, 20, 128, 128)
-        if self.heart:
-            paint.with_shadow(paint.shadow(2, 6, white(0, 0.4)), lambda: paint.fill(cover, "#3a63c4"))
-            paint.fill(cover, ("#8fb6ee", 0), ("#3a63c4", 0.6), ("#2a3f8f", 1), angle=45)
-            glyphs.draw("heart", NSInsetRect(cover, 36, 38), white(1))
-        else:
-            draw_cover(cover, self.image, self.title, self)
-        x, w = 170, b.size.width - 170 - 22
+        case = NSMakeRect(26, 14, 88, 88 * CASE_RATIO)
+        kind = "liked" if self.heart else ("album" if self.kind == u"ALBUM" else "mixtape")
+        note = u"MIXTAPE" if kind != "album" else u"STEREO"
+        draw_case(case, self, self.image, self.title, self.artist, note, kind)
+        x, w = 136, b.size.width - 136 - 22
         paint.text(self.kind, NSMakeRect(x, 20, w, 14), paint.ui(10, True), "#5f5f5f", kern=0.8)
         paint.text(self.title, NSMakeRect(x, 33, w, 34), paint.font("Helvetica-Bold", 28, True), "#1d1d1d", kern=-0.4)
         paint.text(self.meta, NSMakeRect(x, 70, w, 16), paint.ui(12), "#4a4a4a")
@@ -407,8 +541,9 @@ class ListPage(NSObject):
         self.header.kind, self.header.title, self.header.meta, self.header.desc = header
         self.header.heart = kind == "liked"
         self.header.image = (source or {}).get("image")
+        self.header.artist = (source or {}).get("artist") or (source or {}).get("owner") or u""
         self.header.setNeedsDisplay_(True)
-        x = 170
+        x = 136
         for b, title, show in ((self.playButton, u"▶  Play", True), (self.shuffleButton, u"Shuffle", True),
                                (self.saveButton, self.saveTitle(saved), album_view)):
             b.setHidden_(not show)
@@ -488,11 +623,11 @@ class ListPage(NSObject):
 
 
 # ---- the window --------------------------------------------------------------------------------------
-class LCDView(LibraryFlipped):
+class ToolbarLCDView(LibraryFlipped):
     """iTunes 10's status display, small enough for the toolbar. Click it to see the deck."""
 
     def initWithFrame_(self, frame):
-        self = super(LCDView, self).initWithFrame_(frame)
+        self = super(ToolbarLCDView, self).initWithFrame_(frame)
         if self:
             self.line1, self.line2, self.p, self.onClick = u"Kassett", u"Nothing playing", 0.0, None
         return self
@@ -646,6 +781,10 @@ class Library(NSObject):
         for page in (grid, self.list.view, canvasScroll, self.message):
             page.setHidden_(True)
             pages.addSubview_(page)
+        self.fade = FadeView.alloc().initWithFrame_(pages.bounds())
+        self.fade.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable)
+        self.fade.setHidden_(True)
+        pages.addSubview_(self.fade)
 
         split.addSubview_(side)
         split.addSubview_(pages)
@@ -724,7 +863,7 @@ class Library(NSObject):
             setattr(self, ident + "Control", seg)
             view, label = seg, (u"Back/Forward" if ident == "nav" else u"Controls")
         elif ident == "lcd":
-            view = LCDView.alloc().initWithFrame_(NSMakeRect(0, 0, 380, 35))
+            view = ToolbarLCDView.alloc().initWithFrame_(NSMakeRect(0, 0, 380, 35))
             view.onClick = lambda: self.app.showDeck_(None)
             view.setToolTip_(u"Show the cassette deck")
             self.lcd = view
@@ -939,9 +1078,19 @@ class Library(NSObject):
             self.navControl.setEnabled_forSegment_(self.index < len(self.history) - 1, 1)
 
     def showPage(self, page):
-        for p in (self.gridPage, self.list.view, self.canvasPage, self.message):
+        """Switch views with a short crossfade. It fades between two snapshots on an opaque view, so
+        nothing underneath redraws during the fade (the Core 2 Duo stays smooth)."""
+        pages = (self.gridPage, self.list.view, self.canvasPage, self.message)
+        old = [p for p in pages if not p.isHidden()]
+        fading = old and old[0] is not page and self.window.isVisible()
+        if fading:
+            self.fade.start(snapshot(old[0]))
+        for p in pages:
             p.setHidden_(p is not page)
         self.followButton.setHidden_(True)
+        if fading:
+            self.fade.target = page
+            self.fade.performSelector_withObject_afterDelay_("begin:", None, 0)
 
     def showMessage(self, title, text, login=False):
         self.message.title, self.message.text = title, text
@@ -1282,15 +1431,34 @@ class Library(NSObject):
                 rect = NSMakeRect(pad + c * (cw + gap), 22 + r * (cell_h + 22), cw, cell_h)
                 out.append({"rect": rect, "data": it, "draw": lambda e, s, d=d: draw_artist_cell(e, d, canvas),
                             "click": lambda e: self.go(("artist", e["data"]["id"]))})
-            else:
-                cell_h = cw + 38
-                rect = NSMakeRect(pad + c * (cw + gap), 20 + r * (cell_h + 20), cw, cell_h)
-                out.append({"rect": rect, "data": it, "draw": lambda e, s: draw_album_cell(e, canvas),
-                            "click": lambda e: self.go(("album", e["data"]["id"])),
-                            "menu": lambda e: self.albumMenu(e["data"])})
         rows = (len(items) + cols - 1) // cols
-        cell = (min(118, cw) + 30 + 22) if round_ else (cw + 38 + 20)
-        return out, 20 + rows * cell + 20
+        if round_:
+            canvas.backdrop = None
+            return out, 20 + rows * (min(118, cw) + 30 + 22) + 20
+        return self.shelfItems(width, items)
+
+    def shelfItems(self, width, items):
+        """Albums as tapes standing on walnut shelves."""
+        canvas = self.gridCanvas
+        pad, gap = 28, 24
+        cols = max(2, int((width - 2 * pad + gap) // (100 + gap)))
+        cw = (width - 2 * pad - (cols - 1) * gap) / float(cols)
+        ch = cw * CASE_RATIO
+        row_h = 26 + ch + 40
+        out = []
+        rows = max(2, (len(items) + cols - 1) // cols)
+        for r in range(rows):
+            board_y = 26 + r * row_h + ch - 2
+            out.append({"rect": NSMakeRect(0, board_y, width, 34), "draw": lambda e, s, by=board_y: draw_board(width, by)})
+        for i, it in enumerate(items):
+            r, c = divmod(i, cols)
+            rect = NSMakeRect(pad + c * (cw + gap), 26 + r * row_h, cw, ch)
+            out.append({"rect": rect, "data": it, "click": lambda e: self.go(("album", e["data"]["id"])),
+                        "menu": lambda e: self.albumMenu(e["data"]),
+                        "draw": lambda e, s: draw_case(e["rect"], canvas, e["data"]["image"], e["data"]["name"],
+                                                       e["data"]["artist"], e["data"]["year"])})
+        canvas.backdrop = draw_wall
+        return out, 26 + rows * row_h + 10
 
     def albumMenu(self, album):
         menu = NSMenu.alloc().initWithTitle_(u"Album")
@@ -1389,11 +1557,11 @@ class Library(NSObject):
         cw = (right_w - 24) / 3.0
         for i, alb in enumerate(a["albums"]):
             r, c = divmod(i, 3)
-            rect = NSMakeRect(rx + c * (cw + 12), y0 + 34 + r * (cw + 46), cw, cw + 34)
+            rect = NSMakeRect(rx + c * (cw + 12), y0 + 34 + r * (cw * CASE_RATIO + 16), cw, cw * CASE_RATIO)
             items.append({"rect": rect, "data": alb, "draw": lambda e, s: draw_album_cell(e, canvas, year=True),
                           "click": lambda e: self.go(("album", e["data"]["id"])), "menu": lambda e: self.albumMenu(e["data"])})
         rows = (len(a["albums"]) + 2) // 3
-        return items, max(y, y0 + 34 + rows * (cw + 46)) + 24
+        return items, max(y, y0 + 34 + rows * (cw * CASE_RATIO + 16)) + 24
 
     def songItem(self, rect, t, n, play, show_album=False):
         canvas = self.canvas
@@ -1477,11 +1645,11 @@ class Library(NSObject):
             items.append({"rect": NSMakeRect(24, y, width - 48, 22), "draw": lambda e, s: draw_section(e, u"Albums")})
             fit = max(1, int((width - 48 + 20) // (104 + 20)))
             for i, alb in enumerate(albums[:fit]):
-                rect = NSMakeRect(24 + i * (104 + 20), y + 32, 104, 104 + 36)
+                rect = NSMakeRect(24 + i * (104 + 20), y + 32, 96, 96 * CASE_RATIO)
                 items.append({"rect": rect, "data": alb, "draw": lambda e, s: draw_album_cell(e, canvas),
                               "click": lambda e: self.go(("album", e["data"]["id"])),
                               "menu": lambda e: self.albumMenu(e["data"])})
-            y += 32 + 140 + 10
+            y += 32 + 96 * CASE_RATIO + 14
         return items, y + 10
 
     # ---- hidden hook ---------------------------------------------------------------------------------
@@ -1498,6 +1666,61 @@ class Library(NSObject):
         elif view in ("album", "artist"):
             self.debug = view
             self.go(("albums",) if view == "album" else ("artists",))
+
+
+def snapshot(view):
+    rep = view.bitmapImageRepForCachingDisplayInRect_(view.bounds())
+    view.cacheDisplayInRect_toBitmapImageRep_(view.bounds(), rep)
+    img = NSImage.alloc().initWithSize_(view.bounds().size)
+    img.addRepresentation_(rep)
+    return img
+
+
+class FadeView(NSView):
+    DURATION = 0.2
+
+    def initWithFrame_(self, frame):
+        self = super(FadeView, self).initWithFrame_(frame)
+        if self:
+            self.old, self.new, self.t, self.target, self.timer, self.started = None, None, 0.0, None, None, 0
+        return self
+
+    def isOpaque(self):
+        return True
+
+    def start(self, old):
+        self.old, self.new, self.t = old, None, 0.0
+        self.setHidden_(False)
+        self.setNeedsDisplay_(True)
+
+    def begin_(self, _):
+        if self.target is None:
+            return self.finish()
+        self.new = snapshot(self.target)
+        self.started = time.time()
+        if self.timer is None:
+            self.timer = NSTimer.timerWithTimeInterval_target_selector_userInfo_repeats_(1 / 30.0, self, "tick:", None, True)
+            NSRunLoop.currentRunLoop().addTimer_forMode_(self.timer, NSRunLoopCommonModes)
+
+    def tick_(self, timer):
+        self.t = min(1.0, (time.time() - self.started) / self.DURATION)
+        self.setNeedsDisplay_(True)
+        if self.t >= 1.0:
+            self.finish()
+
+    def finish(self):
+        if self.timer:
+            self.timer.invalidate()
+            self.timer = None
+        self.old = self.new = self.target = None
+        self.setHidden_(True)
+
+    def drawRect_(self, rect):
+        if self.old is not None:
+            self.old.drawInRect_fromRect_operation_fraction_(self.bounds(), NSZeroRect, NSCompositeCopy, 1.0)
+        if self.new is not None:
+            self.new.drawInRect_fromRect_operation_fraction_(self.bounds(), NSZeroRect, NSCompositeSourceOver,
+                                                             self.t * self.t * (3 - 2 * self.t))
 
 
 class GridBar(LibraryFlipped):
@@ -1526,13 +1749,8 @@ def draw_section(e, title):
 
 
 def draw_album_cell(e, canvas, year=False):
-    r, a = e["rect"], e["data"]
-    cw = r.size.width
-    cover = NSMakeRect(r.origin.x, r.origin.y, cw, cw)
-    draw_cover(cover, a["image"], a["name"], canvas)
-    paint.text(a["name"], NSMakeRect(r.origin.x, r.origin.y + cw + 6, cw, 15), paint.ui(11, True), "#1d1d1d")
-    paint.text(a["year"] if year else a["artist"], NSMakeRect(r.origin.x, r.origin.y + cw + 20, cw, 15),
-               paint.ui(10 if year else 11), "#666666")
+    a = e["data"]
+    draw_case(e["rect"], canvas, a["image"], a["name"], a["artist"], a["year"])
 
 
 def draw_artist_cell(e, d, canvas, small=False):

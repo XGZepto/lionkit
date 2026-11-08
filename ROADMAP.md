@@ -76,12 +76,14 @@ every Web API command for a restricted device with 403 "Restricted device" and l
 bottom bar that only the Spotify app can control the device, and lists the device in the AirPlay menu with
 "Spotify app only". Command errors now go to the log.
 
-**Deck redesign:** The user found the first deck layout unpolished, so I rebuilt it as one hi-fi faceplate.
-The cassette sits behind a chrome-framed smoked door, and the J-card and tape counter share a dark glass window.
-Below them, one recessed control strip holds aluminium piano keys in slots with their names printed above, green
-PLAY and amber PAUSE indicator lights, a tuner-style tape position dial with a draggable needle (it replaces the
-slider), and a knurled volume knob over a printed 0–10 scale. I checked it with the fake song and with the
-user's real, restricted speaker group.
+**Player and library redesign:** After the user shared references (a Sony Walkman, the Duo-Man concept,
+an iPhone 4 cassette app and Cassoflow), I rebuilt Now Playing as a Walkman-style player. It has a brushed
+blue body, a chrome nameplate, four glossy keys on a silver strip, a volume wheel and an iTunes LCD. The
+cassette is drawn to IEC 60094 scale. Reels turn at tape speed divided by pack radius, the tape runs round
+the rollers and pins past the pressure pad, and the head and pinch roller move in on play and back on pause.
+In the library, albums are cassette cases with printed J-cards standing on walnut shelves, and playlists
+and Liked Songs are hand-labelled mixtapes. Views crossfade in 0.2 s between two snapshots, which keeps
+the Core 2 Duo smooth. I checked all of this with sample data and with the user's library of 143 albums.
 
 **Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
 the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
