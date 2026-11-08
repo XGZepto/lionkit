@@ -15,7 +15,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 |---|---|---|
 | LionKit runtime: curl 8 + OpenSSL 3, dwebp, from MacPorts darwin_11 | — | works, trimmed to 14.5 MB |
 | `lionkit` library: http, keychain, ghost, spotify, markdown, html2md, cocoa, icons | — | works |
-| Planchette (Ghost blog editor) | 0.3 | in user testing |
+| Planchette (Ghost blog editor) | 0.4 | shipped; full screen, find bar, images, scheduling |
 | Kassett (Spotify Connect remote) | 0.2 | in user testing; cassette redesign mocked up |
 | Latchkey (WPA2/WPA3 transition networks) | 0.1 | in daily use on the Mac: joined ZipZap with its saved password, opens at login |
 | Dev tooling: deploy, launch (GUI session), shot, build_lionkit | — | works |
@@ -38,7 +38,7 @@ milestone is reached when all of these are true:
 - [ ] Kassett has the library browser from the mockups (Liked Songs, albums, artists, playlists,
       album and artist pages, search), and people outside the 25 allowlisted Spotify accounts can
       use their own Spotify app when login fails. (WS-1)
-- [ ] Planchette 0.4 is finished, including the bug where a two-line title hides the first line of
+- [x] Planchette 0.4 is finished, including the bug where a two-line title hides the first line of
       text under the divider. (WS-2)
 - [ ] Both apps check `updates.json` on the website once a day and offer new versions from a menu
       item and a sheet. (WS-6)
