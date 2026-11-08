@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Forecast icon: a cloud passing in front of the sun">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7fb2e6"/>
+      <stop offset="1" stop-color="#2f5f9f"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.42" cy="0.38" r="0.6">
+      <stop offset="0" stop-color="#fff6c4"/>
+      <stop offset="0.55" stop-color="#ffd24a"/>
+      <stop offset="1" stop-color="#f29a1d"/>
+    </radialGradient>
+    <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d7dee8"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="44" fill="url(#sky)" stroke="#24497a" stroke-width="3"/>
+  <circle cx="158" cy="94" r="46" fill="url(#sun)"/>
+  <g fill="url(#cloud)" stroke="#b9c4d3" stroke-width="2">
+    <path d="M62 186 h120 a34 34 0 0 0 0 -68 a46 46 0 0 0 -86 -6 a36 36 0 0 0 -34 74 z"/>
+  </g>
+  <path d="M30 60 a44 44 0 0 1 44 -44 h108 a44 44 0 0 1 44 44 v26 c-60 -26 -136 -26 -196 0 z" fill="url(#gloss)"/>
+</svg>

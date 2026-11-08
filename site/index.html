@@ -182,7 +182,7 @@ footer p { margin: 4px 0; }
 <nav class="bar" aria-label="Site">
 <ul>
 <li class="home"><a href="#top"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="10" r="4.2" fill="#ffffff"></circle><circle cx="3" cy="5.2" r="1.9" fill="#ffffff"></circle><circle cx="6.3" cy="2.6" r="1.9" fill="#ffffff"></circle><circle cx="9.7" cy="2.6" r="1.9" fill="#ffffff"></circle><circle cx="13" cy="5.2" r="1.9" fill="#ffffff"></circle></svg>LionKit</a></li>
-<li><a href="#apps">Apps</a></li>
+<li><a href="apps/">Apps</a></li>
 <li><a href="#start">Get Started</a></li>
 <li><a href="#download">Download</a></li>
 <li><a href="#hood">How It Works</a></li>
@@ -206,7 +206,7 @@ footer p { margin: 4px 0; }
 <div class="mba-lid">
 <div class="mba-screen">
 <img class="wall" src="img/lion-desktop.jpg" alt="">
-<img class="win" src="img/planchette.png" alt="">
+<img class="win" src="img/shots/planchette-blog.png" alt="">
 </div>
 </div>
 <div class="mba-base"></div>
@@ -216,12 +216,12 @@ footer p { margin: 4px 0; }
 <section id="apps">
 <div class="wrap">
 <h2>The apps</h2>
-<p class="sub">Every app here is a regular Cocoa app with proper menus, keyboard shortcuts and Keychain support.</p>
+<p class="sub">Every app here is a regular Cocoa app with proper menus, keyboard shortcuts and Keychain support. Each one has its own page with screenshots in <a href="apps/">LionKit Apps</a>.</p>
 
 <article class="app">
 <img class="icon" src="img/planchette-icon.png" alt="Planchette icon: a wooden planchette resting on a leather notebook">
 <div class="text">
-<h3>Planchette <span class="pill amber">BETA 0.3</span></h3>
+<h3>Planchette <span class="pill amber">BETA 0.4</span></h3>
 <p>Planchette is the app I use to write for my blog on the Air, and it works with any blog that runs on Ghost. I write in Markdown on the left, and the preview on the right scrolls along with me. The sidebar sorts my posts into drafts, scheduled and published, and edits sync in both directions, so a change I make in Ghost's web editor shows up in the app too. If a post was changed on the web after I opened it, Planchette asks me before it overwrites anything.</p>
 <ul>
 <li>The preview shows images as well, including WebP files that Lion can't open by itself.</li>
@@ -229,19 +229,21 @@ footer p { margin: 4px 0; }
 <li>I can save a draft, publish, update or unpublish a post without opening a browser.</li>
 </ul>
 <p>It's named after the pointer on a spirit board, which people used to fit with a pencil for "spirit writing". 👻</p>
+<p><a href="apps/planchette.html">More about Planchette ›</a></p>
 </div>
 </article>
 
 <article class="app">
 <img class="icon" src="img/kassett-icon.png" alt="Kassett icon: a green play button">
 <div class="text">
-<h3>Kassett <span class="pill amber">BETA 0.2</span></h3>
-<p>Kassett controls Spotify on your phone, speakers or TV from the Mac. A menu like the AirPlay menu in iTunes lets you move the music to another device. The next version turns the window into the cassette deck below and adds a library browser for playlists, albums, artists and search.</p>
+<h3>Kassett <span class="pill amber">BETA 0.5</span></h3>
+<p>Kassett controls Spotify on your phone, speakers or TV from the Mac and shows what's playing as a cassette turning in a tape deck. Its Library key opens your playlists, albums and artists in a window modelled on iTunes 10, with search and an Up Next list.</p>
 <ul>
-<li>You can play, pause, skip and change the volume on any Spotify Connect device.</li>
+<li>You can play, pause, skip and change the volume on any Spotify Connect device, and move the music to another one.</li>
 <li>Playback control needs a Spotify Premium account.</li>
 </ul>
 <p>The name is Swedish for cassette, because Spotify started in Stockholm. 📼</p>
+<p><a href="apps/kassett.html">More about Kassett ›</a></p>
 </div>
 <div class="shot">
 <div class="deck-wrap" id="deckWrap">
@@ -391,7 +393,7 @@ footer p { margin: 4px 0; }
 </div>
 </div>
 </div>
-<p class="caption">This is the cassette deck planned for Kassett 0.3. Press PLAY or PAUSE to start and stop the reels.</p>
+<p class="caption">This is Kassett's deck, redrawn for this page. Press PLAY or PAUSE to start and stop the reels.</p>
 </div>
 </article>
 
@@ -405,14 +407,25 @@ footer p { margin: 4px 0; }
 <li>It lives in the menu bar and keeps your Wi-Fi password in the keychain.</li>
 </ul>
 <p>A latchkey is the key you carry to let yourself back in, which is what the app does for your Mac. 🔑</p>
+<p><a href="apps/latchkey.html">More about Latchkey ›</a></p>
 </div>
+</article>
+
+<article class="app">
+<img class="icon" src="img/forecast-icon.svg" alt="Forecast icon: a cloud passing in front of the sun">
+<div class="text">
+<h3>Forecast <span class="pill amber">BETA 0.2</span></h3>
+<p>Forecast is a weather widget for Lion's Dashboard, drawn to sit next to Apple's own widgets. Dashboard can't load modern secure websites, so the widget fetches its forecast through LionKit's copy of curl, from Open-Meteo, which needs no account or key.</p>
+<p><a href="apps/forecast.html">More about Forecast ›</a></p>
+</div>
+<div class="shot"><img src="img/shots/forecast-front.png" alt="The Forecast widget showing six days of weather for Cupertino" style="margin: 0 auto; width: 300px;"></div>
 </article>
 
 <h2 style="margin-top: 40px;">What I'm working on next</h2>
 <p class="sub">These are the next apps on my list.</p>
 <div class="soon">
 <div><b>Murmur</b><span>A Mastodon and Bluesky client in the style of Tweetie, with both accounts in one column.</span></div>
-<div><b>Weather widget</b><span>A Dashboard widget that looks like Apple's weather widget and gets its forecast over a modern secure connection.</span></div>
+<div><b>Now Playing widget</b><span>A small Dashboard widget that shows what Kassett is playing.</span></div>
 <div><b>A reading app</b><span>An RSS reader inspired by Reeder.</span></div>
 </div>
 </div>
