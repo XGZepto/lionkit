@@ -18,8 +18,8 @@ case "$name" in "" | *[!A-Za-z0-9\ ]*) echo "bad app name: $name" >&2; exit 2 ;;
 req="req.$(date +%s).$$"
 # Write the request outside the watched folder, then move it in, so launchd never sees a half-written file.
 ssh -o BatchMode=yes "$HOST" "mkdir -p ~/Library/LionKitDev/queue && echo '$action $name' > ~/Library/LionKitDev/$req.tmp && mv ~/Library/LionKitDev/$req.tmp ~/Library/LionKitDev/queue/$req
-for i in 1 2 3 4 5 6 7 8 9 10; do [ -f ~/Library/LionKitDev/queue/$req ] || exit 0; sleep 1; done
+i=0; while [ \$i -lt 60 ]; do [ -f ~/Library/LionKitDev/queue/$req ] || exit 0; sleep 1; i=\$((i+1)); done
 rm -f ~/Library/LionKitDev/queue/$req
-echo 'The dev launcher is not running. Ask the user to run this in Terminal on the Mac:' >&2
+echo 'The dev launcher did not pick up the request within a minute. Other sessions share it, so it may be busy; check ~/Library/Logs/lionkit-devlauncher.log. If it is not running at all, ask the user to run this in Terminal on the Mac:' >&2
 echo '    launchctl load -w ~/Library/LaunchAgents/local.lionkit.devlauncher.plist' >&2
 exit 1"
