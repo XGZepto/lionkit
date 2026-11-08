@@ -100,7 +100,7 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** review (the user is trying full screen again) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** done (the user approved shipping 0.4 on 2026-11-08) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
 Done and checked on the Mac (screenshots, or the app's own snapshot while the screen was locked):
 - The status line, title and rule scroll with the text, so a long title never hides the first line
@@ -131,8 +131,9 @@ Done and checked on the Mac (screenshots, or the app's own snapshot while the sc
 - Entering or leaving full screen (and resizing, or showing the preview or post list) no longer
   scrolls the title out of view or leaves stale pixels: the editor goes back to what was at its top.
 
-Waiting on the user:
-- Try full screen and opening the preview there again, and say whether the lag is gone.
+Ideas for later: fold HTML cards into a compact token in the editor; keep a link's `rel` in
+Markdown so the last lossy block on the site can become text; a real Ghost-style slug preview for
+non-Latin titles.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 
