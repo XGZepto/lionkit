@@ -90,12 +90,15 @@ class AppDelegate(NSObject):
         self.library = None
         self.controllable = True   # False while the playing device only obeys Spotify's own apps
         self.fake = self.defaults.boolForKey_("DebugFakeState")
+        if self.defaults.boolForKey_("DebugPerf"):
+            import perf
+            perf.start()
         art.shared()
         self.buildMenus()
         self.deck = deck.Deck.alloc().initWithApp_(self)
         self.deck.cassette.shell = self.defaults.stringForKey_("CassetteShell") or "clear"
         self.mini = deck.Mini.alloc().initWithApp_(self)
-        self.upnext = upnext.UpNext.alloc().initWithApp_(self)
+        self.upnext = None             # built the first time it's opened (it cost 0.75 s at launch)
         for w in (self.deck.window, self.mini.window):
             w.setReleasedWhenClosed_(False)
         self.connect()
@@ -106,6 +109,7 @@ class AppDelegate(NSObject):
         self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(1.0, self, "tick:", None, True)
         self.tick_(None)
         self.performSelector_withObject_afterDelay_("debugOpen:", None, 1.5)
+        self.performSelector_withObject_afterDelay_("warmUp:", None, 3.0)
         if self.defaults.boolForKey_("DebugProbe"):
             self.performSelector_withObject_afterDelay_("debugProbe:", None, 4)
         if self.defaults.stringForKey_("DebugSnapshot"):
@@ -293,7 +297,7 @@ class AppDelegate(NSObject):
         self.updateContext(item)
         if self.library:
             self.library.showState(self.state, progress)
-        if changed and self.upnext.isShown():
+        if changed and self.upnext and self.upnext.isShown():
             self.refreshQueue()
         if not self.devices or self.ticks % (POLL_EVERY * 5) == 1:
             self.refreshDevices()
@@ -476,6 +480,22 @@ class AppDelegate(NSObject):
             return False
         return True
 
+    def showPending(self, track):
+        """Show the song someone just picked right away, on the deck, the mini player and in the
+        library. Spotify's own state replaces it at the next poll (or puts things back if it failed)."""
+        if not track or self.fake:
+            return
+        item = {"id": track["id"], "uri": track["uri"], "type": "track", "name": track["name"],
+                "duration_ms": track["duration"],
+                "artists": [{"id": i, "name": n} for i, n in track["artists"]],
+                "album": {"id": track.get("album_id"), "name": track["album"],
+                          "images": [{"url": track["big"], "width": 300}] if track.get("big") else []}}
+        prev_id, prev_progress = self.item_id, self.estimatedProgress()
+        state = dict(self.state or {})
+        state.update(item=item, is_playing=True, progress_ms=0)
+        self.state, self.fetched_at = state, time.time()
+        self.applyState(prev_id, prev_progress)
+
     def playFrom(self, context, offset_uri, uris, position, shuffle):
         """Play a list: in its Spotify context (album, playlist, Liked Songs) when there is one,
         else as a list of songs. shuffle is True, False or None to leave Spotify's setting alone."""
@@ -498,7 +518,8 @@ class AppDelegate(NSObject):
                     if not uris or e.reason in ("PREMIUM_REQUIRED", "NO_ACTIVE_DEVICE"):
                         raise
             client.play_tracks(uris, position)
-        self.send(work, 1.0)
+        self.send(work, 0.5)
+        self.performSelector_withObject_afterDelay_("pollNow:", None, 1.6)
 
     def setShell_(self, sender):
         self.deck.cassette.shell = sender.representedObject()
@@ -513,6 +534,9 @@ class AppDelegate(NSObject):
             self.library.showState(self.state, self.estimatedProgress())
         self.library.window.makeKeyAndOrderFront_(None)
 
+    def warmUp_(self, _):
+        import library  # noqa: F401  (loading it takes about 0.4 s; better now than on the first click)
+
     def showDeck_(self, sender):
         if self.mini.window.isVisible():
             self.mini.window.orderOut_(None)
@@ -523,7 +547,8 @@ class AppDelegate(NSObject):
     def toggleMini_(self, sender):
         if self.mini.window.isVisible():
             return self.showDeck_(sender)
-        self.upnext.popover.close()
+        if self.upnext:
+            self.upnext.popover.close()
         self.deck.window.orderOut_(None)
         self.defaults.setBool_forKey_(True, "MiniMode")
         self.mini.window.makeKeyAndOrderFront_(None)
@@ -544,6 +569,8 @@ class AppDelegate(NSObject):
     def showUpNext_(self, sender):
         if self.mini.window.isVisible():
             self.showDeck_(sender)
+        if self.upnext is None:
+            self.upnext = upnext.UpNext.alloc().initWithApp_(self)
         self.upnext.toggleFrom_(self.deck.upNextButton)
 
     def refreshQueue(self):
@@ -561,7 +588,7 @@ class AppDelegate(NSObject):
         def done(_, error):
             if error:
                 self.flash(unicode(error))
-            elif self.upnext.isShown():
+            elif self.upnext and self.upnext.isShown():
                 self.refreshQueue()
         cocoa.in_background(lambda: self.client.add_to_queue(uri), done)
 
@@ -794,6 +821,7 @@ class AppDelegate(NSObject):
         if view == "mini":
             self.toggleMini_(None)
         elif view == "upnext":
+            self.upnext = upnext.UpNext.alloc().initWithApp_(self)
             self.upnext.popover.setBehavior_(upnext.POPOVER_APP_DEFINED)
             self.showUpNext_(None)
         elif view.startswith("ownapp"):
@@ -801,6 +829,9 @@ class AppDelegate(NSObject):
             self.ownApp.showFor(self.deck.window)
             if view == "ownapp-guide":
                 self.ownApp.showGuide_(None)
+        elif view == "bench":
+            self.showLibrary_(None)
+            self.library.bench()
         elif view.startswith("library"):
             self.showLibrary_(None)
             if ":" in view:
@@ -838,7 +869,7 @@ class AppDelegate(NSObject):
         windows = [("deck", self.deck.window), ("mini", self.mini.window),
                    ("library", getattr(self.library, "window", None)),
                    ("sheet", getattr(getattr(self, "ownApp", None), "sheet", None)),
-                   ("upnext", self.upnext.view.window() if self.upnext.isShown() else None)]
+                   ("upnext", self.upnext.view.window() if self.upnext and self.upnext.isShown() else None)]
         if self.library is not None:      # how long the visible library page takes to draw, five times
             page = [p for p in (self.library.gridPage, self.library.canvasPage, self.library.list.view) if not p.isHidden()]
             if page:
@@ -861,6 +892,10 @@ class AppDelegate(NSObject):
 
 
 if __name__ == "__main__":
+    # Python 2 lets a busy background thread (parsing Spotify's JSON, say) keep the interpreter for
+    # 100 bytecodes at a time, which on a two-core Mac can leave the main thread waiting long enough
+    # to stutter. Switching every 10 keeps drawing and clicks responsive.
+    sys.setcheckinterval(10)
     objc.setVerbose(True)  # full tracebacks in the log for errors inside Cocoa callbacks
     app = NSApplication.sharedApplication()
     delegate = AppDelegate.alloc().init()

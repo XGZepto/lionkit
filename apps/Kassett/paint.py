@@ -10,14 +10,25 @@ _gradients = {}
 _fonts = {}
 
 
+_colors = {}
+
+
 def hexc(h, a=1.0):
-    h = h.lstrip("#")
-    return NSColor.colorWithCalibratedRed_green_blue_alpha_(
-        int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0, a)
+    key = (h, a)
+    c = _colors.get(key)      # colours are made thousands of times a second while drawing; reuse them
+    if c is None:
+        v = h.lstrip("#")
+        c = _colors[key] = NSColor.colorWithCalibratedRed_green_blue_alpha_(
+            int(v[0:2], 16) / 255.0, int(v[2:4], 16) / 255.0, int(v[4:6], 16) / 255.0, a)
+    return c
 
 
 def white(w, a=1.0):
-    return NSColor.colorWithCalibratedWhite_alpha_(w, a)
+    key = (w, a, None)
+    c = _colors.get(key)
+    if c is None:
+        c = _colors[key] = NSColor.colorWithCalibratedWhite_alpha_(w, a)
+    return c
 
 
 def gradient(*stops):

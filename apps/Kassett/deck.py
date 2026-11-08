@@ -645,11 +645,24 @@ class KeyButton(NSButton):
         return False
 
 
+_key_looks = {}
+
+
 class KeyCell(NSButtonCell):
     """A glossy plastic key on the silver strip, lit the way Lion's Aqua buttons are. `accent` makes it
     candy orange (play while playing)."""
 
     def drawWithFrame_inView_(self, frame, view):
+        key = (getattr(self, "glyph", "play"), getattr(self, "accent", False), bool(self.isHighlighted()),
+               bool(self.isEnabled()), int(frame.size.width), int(frame.size.height))
+        img = _key_looks.get(key)
+        if img is None:
+            img = _key_looks[key] = flipped_image(frame.size.width, frame.size.height,
+                                                  lambda: self.drawKey(frame))
+        img.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+            NSMakeRect(0, 0, frame.size.width, frame.size.height), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
+
+    def drawKey(self, frame):
         down = self.isHighlighted()
         accent = getattr(self, "accent", False)
         w = frame.size.width
@@ -720,10 +733,12 @@ class WheelView(FlippedView):
         return False
 
     def setVolume(self, v, enabled):
+        before = (self.volume, self.enabled)
         if self.start is None:
             self.volume = max(0, min(100, int(v)))
         self.enabled = enabled
-        self.setNeedsDisplay_(True)
+        if (self.volume, self.enabled) != before:
+            self.setNeedsDisplay_(True)
 
     def drawRect_(self, rect):
         w = self.bounds().size.width
@@ -824,13 +839,18 @@ class LCDView(FlippedView):
 
     def drawRect_(self, rect):
         w, h = self.bounds().size.width, self.bounds().size.height - 1
-        r = NSMakeRect(0.5, 0.5, w - 1, h - 1)
-        paint.fill(paint.rounded(NSOffsetRect(r, 0, 1), 6), white(1, 0.3))
-        shape = paint.rounded(r, 6)
-        paint.fill(shape, "#f7f9ee", "#d6dcc6")
-        paint.inner_shadow(shape, 1, 3, white(0, 0.25))
-        paint.clipped(shape, lambda: paint.fill(NSMakeRect(0, 0, w, h * 0.45), white(1, 0.35), white(1, 0.05)))
-        paint.stroke(shape, "#4d5144", 1)
+        if getattr(self, "glass", None) is None:
+
+            def glass():
+                r = NSMakeRect(0.5, 0.5, w - 1, h - 1)
+                paint.fill(paint.rounded(NSOffsetRect(r, 0, 1), 6), white(1, 0.3))
+                shape = paint.rounded(r, 6)
+                paint.fill(shape, "#f7f9ee", "#d6dcc6")
+                paint.inner_shadow(shape, 1, 3, white(0, 0.25))
+                paint.clipped(shape, lambda: paint.fill(NSMakeRect(0, 0, w, h * 0.45), white(1, 0.35), white(1, 0.05)))
+                paint.stroke(shape, "#4d5144", 1)
+            self.glass = flipped_image(w, h + 1, glass)
+        draw_part(self.glass, rect)
         cover = NSMakeRect(8, 7, 36, 36)
         if self.art is not None:
             paint.image(self.art, cover)
@@ -1047,13 +1067,15 @@ class Deck(NSObject):
         if self.whirr is None:
             self.cassette.spin(1.0 if playing else 0.0)
         cell = self.playKey.cell()
-        cell.glyph, cell.accent = ("pause" if playing else "play"), playing
-        self.playKey.setToolTip_(u"Pause" if playing else u"Play")
-        self.playKey.setEnabled_(controllable)
-        for k in (self.nextKey, self.prevKey):
-            k.setEnabled_(controllable and has_track)
-        for k in self.keys.values():
-            k.setNeedsDisplay_(True)
+        look = (("pause" if playing else "play"), playing)
+        if (cell.glyph, cell.accent) != look:
+            cell.glyph, cell.accent = look
+            self.playKey.setToolTip_(u"Pause" if playing else u"Play")
+            self.playKey.setNeedsDisplay_(True)
+        for k, on in ((self.playKey, controllable), (self.nextKey, controllable and has_track),
+                      (self.prevKey, controllable and has_track)):
+            if bool(k.isEnabled()) != bool(on):
+                k.setEnabled_(on)
         self.ensureTimer()
 
     def setPosition(self, progress_ms, duration_ms, jumped):
@@ -1147,7 +1169,12 @@ class MiniView(FlippedView):
             self.bg = flipped_image(b.size.width, b.size.height,
                                     lambda: draw_body(b.size.width, b.size.height, MINI_STRIP, False))
         draw_part(self.bg, rect, NSCompositeCopy)
-        draw_mini_cassette(12, 16, self.angle)
+        if getattr(self, "shell", None) is None:      # the cassette without its hubs, drawn once
+            self.shell = flipped_image(120, 90, lambda: draw_mini_cassette(12, 16, None))
+        self.shell.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+            NSMakeRect(0, 0, 120, 90), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
+        for cx in (12 + 34, 12 + 62):
+            draw_mini_hub(cx, 16 + 28, self.angle)
         x, w = 122, MINI_STRIP - 122 - 14
         sh = paint.shadow(-1, 0, white(0, 0.35))
         paint.text(self.title, NSMakeRect(x, 22, w, 18), paint.ui(13, True), white(1), sh=sh)
@@ -1177,24 +1204,39 @@ def draw_mini_cassette(x, y, angle):
     win = paint.rounded(NSMakeRect(x + 22, y + 18, 52, 20), 5)
     paint.fill(win, "#2b1d14")
     paint.inner_shadow(win, 1, 2, white(0, 0.8))
-    for cx in (x + 34, x + 62):
-        NSGraphicsContext.saveGraphicsState()
-        t = NSAffineTransform.transform()
-        t.translateXBy_yBy_(cx, y + 28)
-        t.rotateByDegrees_(-angle)
-        t.concat()
-        paint.fill(paint.oval(0, 0, 7.5), "#f1ece0")
-        paint.fill(paint.oval(0, 0, 3.4), "#1a1410")
-        for i in range(6):
-            NSGraphicsContext.saveGraphicsState()
-            rot = NSAffineTransform.transform()
-            rot.rotateByDegrees_(60 * i)
-            rot.concat()
-            paint.fill(NSMakeRect(-0.6, -3.4, 1.2, 1.4), "#f1ece0")
-            NSGraphicsContext.restoreGraphicsState()
-        NSGraphicsContext.restoreGraphicsState()
+    if angle is not None:
+        for cx in (x + 34, x + 62):
+            draw_mini_hub(cx, y + 28, angle)
     for sx_, sy_ in ((x + 4, y + 4), (x + 92, y + 4), (x + 4, y + 58), (x + 92, y + 58)):
         paint.fill(paint.oval(sx_, sy_, 1.6), "#9a9a9a")
+
+
+_mini = {}
+
+
+def draw_mini_hub(cx, cy, angle):
+    """A small hub: one cached bitmap, rotated, rather than a dozen shapes every frame."""
+    if "hub" not in _mini:
+        def body():
+            paint.fill(paint.oval(8, 8, 7.5), "#f1ece0")
+            paint.fill(paint.oval(8, 8, 3.4), "#1a1410")
+            for i in range(6):
+                NSGraphicsContext.saveGraphicsState()
+                rot = NSAffineTransform.transform()
+                rot.translateXBy_yBy_(8, 8)
+                rot.rotateByDegrees_(60 * i)
+                rot.concat()
+                paint.fill(NSMakeRect(-0.6, -3.4, 1.2, 1.4), "#f1ece0")
+                NSGraphicsContext.restoreGraphicsState()
+        _mini["hub"] = flipped_image(16, 16, body)
+    NSGraphicsContext.saveGraphicsState()
+    t = NSAffineTransform.transform()
+    t.translateXBy_yBy_(cx, cy)
+    t.rotateByDegrees_(-angle)
+    t.concat()
+    _mini["hub"].drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+        NSMakeRect(-8, -8, 16, 16), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
+    NSGraphicsContext.restoreGraphicsState()
 
 
 class Mini(NSObject):
@@ -1229,8 +1271,9 @@ class Mini(NSObject):
 
     def show(self, title, artist, p, playing, has_track):
         v = self.view
-        v.title, v.artist, v.p, v.has_track = title, artist, p, has_track
-        v.setNeedsDisplay_(True)
+        if (v.title, v.artist, round(v.p, 3), v.has_track) != (title, artist, round(p, 3), has_track):
+            v.title, v.artist, v.p, v.has_track = title, artist, p, has_track
+            v.setNeedsDisplayInRect_(NSMakeRect(118, 0, MINI_STRIP - 118, 94))   # only the text and the bar
         self.playing = playing
         self.playButton.cell().glyph = "pause" if playing else "play"
         self.playButton.cell().accent = playing

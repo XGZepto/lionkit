@@ -118,6 +118,13 @@ def have_art(url):
     return bool(url) and os.path.exists(art.path_for(url))
 
 
+def draw_blank_case(r):
+    """A plain empty case, shown for a moment while the real tape is drawn."""
+    case = paint.rounded(r, 3)
+    paint.fill(case, white(1, 0.12), white(1, 0.04))
+    paint.stroke(paint.rounded(NSInsetRect(r, 0.5, 0.5), 2.5), white(1, 0.35), 1)
+
+
 def case_key(e):
     a, r = e["data"], e["rect"]
     return ("case", a.get("id"), a.get("image"), int(r.size.width), int(r.size.height), have_art(a.get("image")))
@@ -180,6 +187,8 @@ class CanvasView(LibraryFlipped):
             self.backdrop(rect)
         else:
             paint.fill(rect, "#ffffff")
+        budget = time.time() + 0.03      # draw new tapes for at most 30 ms, the rest on the next passes
+        later = []
         for it in self.items:
             r = it["rect"]
             if not NSIntersectsRect(rect, NSInsetRect(r, -PAD, -PAD)):
@@ -188,12 +197,26 @@ class CanvasView(LibraryFlipped):
             if not key:
                 it["draw"](it, it is self.selected)
                 continue
-            img = self.rendered.pop(key, None) or self.render(it)
+            img = self.rendered.pop(key, None)
+            if img is None:
+                if time.time() > budget:
+                    draw_blank_case(r)
+                    later.append(r)
+                    continue
+                img = self.render(it)
             self.rendered[key] = img
             while len(self.rendered) > 160:
                 self.rendered.popitem(last=False)
             img.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
                 NSInsetRect(r, -PAD, -PAD), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
+        if later:
+            self.pending = later
+            self.performSelector_withObject_afterDelay_("drawPending:", None, 0.01)
+
+    def drawPending_(self, _):
+        for r in getattr(self, "pending", []):
+            self.setNeedsDisplayInRect_(NSInsetRect(r, -PAD, -PAD))
+        self.pending = []
 
     def render(self, it):
         """Draw an item once into a bitmap the size it's shown at, shadow and all."""
@@ -217,8 +240,10 @@ class CanvasView(LibraryFlipped):
     def mouseDown_(self, event):
         it = self.itemAt(event)
         if it is not self.selected and it is not None and it.get("selectable"):
+            if self.selected is not None:
+                self.setNeedsDisplayInRect_(self.selected["rect"])
             self.selected = it
-            self.setNeedsDisplay_(True)
+            self.setNeedsDisplayInRect_(it["rect"])
         if it is None:
             return
         if event.clickCount() == 2 and it.get("double"):
@@ -684,11 +709,21 @@ class ToolbarLCDView(LibraryFlipped):
 
     def drawRect_(self, rect):
         b = NSMakeRect(0.5, 0.5, self.bounds().size.width - 1, self.bounds().size.height - 2)
-        paint.fill(paint.rounded(NSOffsetRect(b, 0, 1), 5), white(1, 0.6))
-        shape = paint.rounded(b, 5)
-        paint.fill(shape, "#f7f9ee", "#d6dcc6")
-        paint.inner_shadow(shape, 1, 2, white(0, 0.18))
-        paint.stroke(shape, "#787c6e", 1)
+        if getattr(self, "glass", None) is None:       # the LCD's glass, drawn once
+
+            def glass():
+                paint.fill(paint.rounded(NSOffsetRect(b, 0, 1), 5), white(1, 0.6))
+                shape = paint.rounded(b, 5)
+                paint.fill(shape, "#f7f9ee", "#d6dcc6")
+                paint.inner_shadow(shape, 1, 2, white(0, 0.18))
+                paint.stroke(shape, "#787c6e", 1)
+            size = self.bounds().size
+            self.glass = NSImage.alloc().initWithSize_(size)
+            self.glass.lockFocusFlipped_(True)
+            glass()
+            self.glass.unlockFocus()
+        self.glass.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
+            self.bounds(), NSZeroRect, NSCompositeSourceOver, 1.0, True, None)
         w = b.size.width
         paint.text(self.line1, NSMakeRect(12, 3, w - 24, 14), paint.ui(11, True), "#282a24", NSCenterTextAlignment)
         paint.text(self.line2, NSMakeRect(12, 15, w - 24, 13), paint.ui(10), "#464840", NSCenterTextAlignment)
@@ -964,7 +999,9 @@ class Library(NSObject):
             self.lcd.setNeedsDisplay_(True)
         if hasattr(self, "transportControl"):
             playing = bool(state and state.get("is_playing") and item)
-            self.transportControl.setImage_forSegment_(glyphs.image("pause" if playing else "play", 13), 1)
+            if getattr(self, "shows_pause", None) != playing:
+                self.shows_pause = playing
+                self.transportControl.setImage_forSegment_(glyphs.image("pause" if playing else "play", 13), 1)
         if uri != self.playing_uri:
             self.playing_uri = uri
             self.list.refreshPlaying()
@@ -1340,11 +1377,18 @@ class Library(NSObject):
             context = (source or {}).get("uri")
         uris = [r["uri"] for r in rows if r["playable"]]
         if row is None:
+            if rows and not shuffle:
+                self.app.showPending(rows[0])
             self.app.playFrom(context, None, uris[:100], 0, shuffle if shuffle else False)
             return
         r = rows[row]
+        self.app.showPending(r)
         start = uris.index(r["uri"]) if r["uri"] in uris else 0
         self.app.playFrom(context, r["uri"], uris[start:start + 100], 0, None)
+
+    def playSongs(self, songs, i):
+        self.app.showPending(songs[i])
+        self.app.playFrom(None, None, [t["uri"] for t in songs[i:]], 0, None)
 
     # ---- right-click on a song ----------------------------------------------------------------------
     def trackMenu(self, t, play, in_liked=False):
@@ -1610,14 +1654,13 @@ class Library(NSObject):
         inner = width - 52
         items.append({"rect": NSMakeRect(26, y0, inner, 22), "draw": lambda e, s: draw_section(e, u"Popular")})
         songs = a["songs"][:10]
-        uris = [t["uri"] for t in songs]
         cols = 2 if len(songs) > 5 and inner >= 640 else 1
         col_w = (inner - 26 * (cols - 1)) / float(cols)
         per_col = (len(songs) + cols - 1) // cols if cols > 1 else len(songs)
         for i, t in enumerate(songs):
             c, r = divmod(i, per_col) if cols > 1 else (0, i)
             rect = NSMakeRect(26 + c * (col_w + 26), y0 + 22 + r * 34, col_w, 34)
-            items.append(self.songItem(rect, t, i, lambda i=i: self.app.playFrom(None, None, uris[i:], 0, None),
+            items.append(self.songItem(rect, t, i, lambda i=i: self.playSongs(songs, i),
                                        show_album=True))
         y = y0 + 22 + per_col * 34
         if not songs:
@@ -1696,7 +1739,7 @@ class Library(NSObject):
         def play_top(e):
             kind, obj = top
             if kind == "song":
-                self.app.playFrom(None, None, [t["uri"] for t in songs], 0, None)
+                self.playSongs(songs, 0)
             else:
                 self.app.playFrom(obj["uri"], None, [], 0, None)
         items.append({"rect": NSMakeRect(24 + 14 + 92 + 12, y + 14 + 14 + 8 + 92 - 24, 74, 24),
@@ -1704,10 +1747,9 @@ class Library(NSObject):
         sx = 24 + 250 + 22
         sw = width - sx - 24
         items.append({"rect": NSMakeRect(sx, y, sw, 22), "draw": lambda e, s: draw_section(e, u"Songs")})
-        uris = [t["uri"] for t in songs]
         for i, t in enumerate(songs[:4]):
             items.append(self.songItem(NSMakeRect(sx, y + 22 + i * 34, sw, 34), t, None,
-                                       lambda i=i: self.app.playFrom(None, None, uris[i:], 0, None)))
+                                       lambda i=i: self.playSongs(songs, i)))
         y += 176 + 18
         if artists:
             items.append({"rect": NSMakeRect(24, y, width - 48, 22), "draw": lambda e, s: draw_section(e, u"Artists")})
@@ -1727,6 +1769,46 @@ class Library(NSObject):
                               "menu": lambda e: self.albumMenu(e["data"]), "cache": case_key})
             y += 32 + 96 * CASE_RATIO + 14
         return items, y + 10
+
+    # ---- a scripted benchmark (DebugOpenView bench, with DebugPerf on) ----------------------------------
+    def bench(self):
+        """Scroll the shelf, Liked Songs and the artists on their own and log how long each step takes
+        to draw, so lag can be measured without anyone at the Mac."""
+        self.go(("albums",))
+        self.performSelector_withObject_afterDelay_("benchShelf:", None, 10.0)
+
+    def benchScroll(self, scroll, name, step, steps):
+        import perf
+        clip, times = scroll.contentView(), []
+        for i in list(range(steps)) + list(reversed(range(steps))):
+            clip.scrollToPoint_(NSMakePoint(0, i * step))
+            scroll.reflectScrolledClipView_(clip)
+            start = time.time()
+            self.window.displayIfNeeded()
+            times.append((time.time() - start) * 1000)
+        down, up = sorted(times[:steps]), sorted(times[steps:])
+        for label, t in ((u"first pass", down), (u"second pass", up)):
+            perf.mark(u"bench %s, %s: %d steps of %d px, median %.1f ms, 90%% %.1f ms, worst %.1f ms" % (
+                name, label, len(t), step, t[len(t) // 2], t[int(len(t) * 0.9)], t[-1]))
+
+    def benchShelf_(self, _):
+        import perf
+        self.benchScroll(self.gridCanvas.enclosingScrollView(), u"albums shelf", 40, 60)
+        start = time.time()
+        snapshot(self.gridPage)
+        perf.mark(u"bench snapshot of the shelf page (used by fades and flips): %.0f ms" % ((time.time() - start) * 1000))
+        self.go(("liked",))
+        self.performSelector_withObject_afterDelay_("benchLiked:", None, 6.0)
+
+    def benchLiked_(self, _):
+        self.benchScroll(self.list.scroll, u"Liked Songs", 40, 60)
+        self.go(("artists",))
+        self.performSelector_withObject_afterDelay_("benchArtists:", None, 8.0)
+
+    def benchArtists_(self, _):
+        import perf
+        self.benchScroll(self.gridCanvas.enclosingScrollView(), u"artists", 30, 60)
+        perf.mark(u"bench done")
 
     # ---- hidden hook ---------------------------------------------------------------------------------
     def debugOpen(self, view):

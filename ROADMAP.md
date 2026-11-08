@@ -92,6 +92,16 @@ player uses the Walkman materials, and the chrome nameplate reads better. A real
 limit" on artist pages: Spotify now allows at most 10 albums per request there. Hidden test settings:
 `DebugAnimationScale` slows the flip, and `DebugSnapshot` makes Kassett draw its windows into PNGs.
 
+**Performance:** `perf.py` adds a hitch detector and a main-thread profiler
+(`defaults write page.zepto.kassett DebugPerf -bool yes`). With `DebugOpenView bench`, a scripted benchmark
+scrolls the shelf, Liked Songs and the artists and logs each step to `~/Library/Logs/Kassett-perf.txt`.
+Fixes from what it found: views redraw only when they change; key looks, both LCDs' glass, tape cases and
+artist circles are cached bitmaps; the canvas is opaque; first-time tape drawing gets 30 ms per pass;
+the mini player rotates cached hubs; Up Next is built on first use; the library code loads 3 s after launch;
+picked songs show at once; and Python switches threads every 10 bytecodes. Scroll steps went from 6–11 ms
+to about 1 ms (90% under 25 ms), and the recurring 120–170 ms freezes are mostly gone. Launch still spends
+about 0.8 s reading the login from the keychain.
+
 **Next:** The user should click through playing from a list, Add to Up Next, the devices menu, the keys and
 the knob with real playback, and log out and in once so Kassett can follow artists. I haven't drawn the
 cassette app icon in `icon.py` yet. I also couldn't test the not-allowlisted sheet with a real refused
