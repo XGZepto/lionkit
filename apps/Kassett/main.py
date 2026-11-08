@@ -342,9 +342,22 @@ class AppDelegate(NSObject):
                 return self.notAllowlisted()
             self.flash(unicode(error))
             return
+        expecting = getattr(self, "expecting", None)
+        if expecting:
+            check, deadline, _ = expecting
+            if not check(state or {}) and time.time() < deadline:
+                # Spotify hasn't applied the last command yet: keep showing it and ask again shortly,
+                # instead of jumping back to the old state for a moment.
+                self.performSelector_withObject_afterDelay_("pollNow:", None, 0.6)
+                return
+            self.expecting = None
         prev_id, prev_progress = self.item_id, self.estimatedProgress()
         self.state, self.fetched_at = state, time.time()
         self.applyState(prev_id, prev_progress)
+
+    def expect(self, check, seconds=5.0):
+        """After a command, ignore Spotify's answers that don't show it yet (for up to `seconds`)."""
+        self.expecting = (check, time.time() + seconds, time.time())
 
     def applyState(self, prev_id, prev_progress):
         item = self.item()
@@ -456,7 +469,8 @@ class AppDelegate(NSObject):
             if error:
                 log("command failed: %r (HTTP %s, %s)" % (error, getattr(error, "status", "?"), getattr(error, "reason", None)))
                 self.flash(unicode(error))
-            self.performSelector_withObject_afterDelay_("pollNow:", None, poll_after)
+                self.expecting = None       # it didn't happen: show Spotify's real state straight away
+            self.performSelector_withObject_afterDelay_("pollNow:", None, 0.1 if error else poll_after)
         cocoa.in_background(work, done)
 
     def setLocalPlaying(self, playing):
@@ -474,6 +488,7 @@ class AppDelegate(NSObject):
             self.deck.setPlaying(True, True)  # keep the latched key down
             return
         self.setLocalPlaying(True)
+        self.expect(lambda s: bool(s.get("is_playing")))
         self.send(self.client.play, 0.8)
 
     def pause_(self, sender):
@@ -481,12 +496,18 @@ class AppDelegate(NSObject):
             self.deck.setPlaying(False, bool(self.item()))
             return
         self.setLocalPlaying(False)
+        self.expect(lambda s: not s.get("is_playing"))
         self.send(self.client.pause, 0.8)
 
     def playPause_(self, sender):
         (self.pause_ if self.isPlaying() else self.play_)(sender)
 
-    def skip(self, work):
+    def skip(self, work, back=False):
+        old_id, was_at = self.item_id, self.estimatedProgress()
+        if back and was_at > 4000:      # Spotify restarts the song rather than going back one
+            self.expect(lambda s: (s.get("item") or {}).get("id") != old_id or (s.get("progress_ms") or 0) < 4000)
+        else:
+            self.expect(lambda s: (s.get("item") or {}).get("id") != old_id)
         if self.state and self.item():
             self.state["progress_ms"], self.fetched_at = 0, time.time()
             self.showPosition(0, True)
@@ -496,7 +517,7 @@ class AppDelegate(NSObject):
         self.skip(self.client.next)
 
     def previous_(self, sender):
-        self.skip(self.client.previous)
+        self.skip(self.client.previous, True)
 
     def seekTo(self, ms):
         item = self.item()
@@ -505,6 +526,7 @@ class AppDelegate(NSObject):
         ms = max(0, min(ms, item.get("duration_ms", 0) - 1000))
         self.state["progress_ms"], self.fetched_at = ms, time.time()
         self.showPosition(ms, True)
+        self.expect(lambda s: abs((s.get("progress_ms") or 0) - ms) < 4000)
         self.send(lambda: self.client.seek(ms), 0.8)
 
     def rewind_(self, sender):
@@ -564,6 +586,8 @@ class AppDelegate(NSObject):
                 "album": {"id": track.get("album_id"), "name": track["album"],
                           "images": [{"url": track["big"], "width": 300}] if track.get("big") else []}}
         prev_id, prev_progress = self.item_id, self.estimatedProgress()
+        uri, name = track["uri"], track["name"]
+        self.expect(lambda s: (s.get("item") or {}).get("uri") == uri or (s.get("item") or {}).get("name") == name)
         state = dict(self.state or {})
         state.update(item=item, is_playing=True, progress_ms=0)
         self.state, self.fetched_at = state, time.time()
@@ -576,6 +600,11 @@ class AppDelegate(NSObject):
             return
         client = self.client
         current = bool((self.state or {}).get("shuffle_state"))
+        recent = getattr(self, "expecting", None)
+        if not (recent and time.time() - recent[2] < 0.3):     # showPending didn't just set one
+            old_id = self.item_id
+            self.expect(lambda s: (s.get("item") or {}).get("id") != old_id or
+                        ((s.get("context") or {}).get("uri") == context and bool(s.get("is_playing"))))
 
         def work():
             if shuffle is not None and shuffle != current:
@@ -714,10 +743,12 @@ class AppDelegate(NSObject):
         device_id, name = sender.representedObject(), sender.title().split(u"\t")[0]
         play = self.state is None or bool(self.state.get("is_playing"))
         self.deck.setStatus(u"Switching to %s…" % name, None)
+        self.expect(lambda s: (s.get("device") or {}).get("id") == device_id, 8.0)
 
         def done(_, error):
             if error:
                 self.flash(unicode(error))
+                self.expecting = None
             self.refreshDevices()
             self.performSelector_withObject_afterDelay_("pollNow:", None, 1.0)
         self.serial += 1
