@@ -5,6 +5,7 @@
 Q="$HOME/Library/LionKitDev/queue"
 for req in "$Q"/*; do
     [ -f "$req" ] || continue
+    case "$req" in *.tmp) continue ;; esac
     read -r action name < "$req"
     rm -f "$req"
     case "$name" in

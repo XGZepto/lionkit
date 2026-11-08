@@ -29,6 +29,24 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 3. **Social**: a Mastodon + Bluesky client in the spirit of Tweetie. (WS-4)
 4. **Little joys**: Dashboard widgets, Wi-Fi fix for everyone, more apps from the backlog. (WS-3, WS-7)
 
+## Current milestone: public beta 0.5
+
+The goal is a first public beta. Someone with a Lion Mac can go to the website, download Kassett
+and Planchette from a GitHub release, open them, and get told when a newer version is out. The
+milestone is reached when all of these are true:
+
+- [ ] Kassett has the library browser from the mockups (Liked Songs, albums, artists, playlists,
+      album and artist pages, search), and people outside the 25 allowlisted Spotify accounts can
+      use their own Spotify app when login fails. (WS-1)
+- [ ] Planchette 0.4 is finished, including the bug where a two-line title hides the first line of
+      text under the divider. (WS-2)
+- [ ] Both apps check `updates.json` on the website once a day and offer new versions from a menu
+      item and a sheet. (WS-6)
+- [ ] The DMGs have been looked at in Finder, the right-click Open path works on a downloaded copy,
+      and the site has download buttons pointing at the release. (WS-6)
+- [ ] The coordinating session has merged everything, tested it on the Mac, and published the
+      release as a GitHub pre-release.
+
 ---
 
 ## WS-1 · Kassett: the cassette deck
