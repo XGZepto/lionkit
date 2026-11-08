@@ -1,0 +1,286 @@
+/* Forecast. Window: 300 wide; the panel sits 38 px down so the art can rise above it.
+   Heights live in Forecast.js too (WIDTH, COLLAPSED, EXPANDED, PANEL_*). */
+
+body {
+    margin: 0;
+    font-family: "Helvetica Neue", "Lucida Grande", sans-serif;
+    -webkit-user-select: none;
+    cursor: default;
+}
+
+/* --- Front ---------------------------------------------------------------------------- */
+
+#front {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 300px;
+}
+
+#panel {
+    position: absolute;
+    left: 8px;
+    top: 38px;
+    width: 284px;
+    height: 170px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    border: 2px solid;
+    border-radius: 11px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 4px 9px rgba(0, 0, 0, 0.5);
+    -webkit-transition: height 0.3s ease-in-out;
+}
+
+.day #panel {
+    background: -webkit-linear-gradient(top, #3a5472, #4f6785);
+    border-color: #b6c0cc #75879f #8293a8;
+}
+
+.night #panel {
+    background: -webkit-linear-gradient(top, #43273c, #5c4256);
+    border-color: #b4abb0 #7f6a79 #8a7484;
+}
+
+#cap {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 280px;
+    height: 22px;
+    border-radius: 9px 9px 0 0;
+}
+
+.day #cap {
+    background: -webkit-linear-gradient(top, #a9b1ba, #66788e);
+}
+
+.night #cap {
+    background: -webkit-linear-gradient(top, #aaa3a7, #6c5967);
+}
+
+#art {
+    position: absolute;
+    left: 60px;
+    top: 2px;
+    z-index: 1;
+}
+
+#head {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 280px;
+    height: 54px;
+    z-index: 2;
+    color: white;
+    font-weight: bold;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
+}
+
+#high, #city, #low {
+    position: absolute;
+    left: 10px;
+    width: 104px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#high { top: 5px; }
+#city { top: 18px; font-size: 13px; letter-spacing: -0.3px; }
+#low { top: 36px; }
+
+.minor {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+#temp {
+    position: absolute;
+    right: 14px;
+    top: -6px;
+    width: 130px;
+    text-align: right;
+    font-family: "HelveticaNeue-Light", "Helvetica Neue";
+    font-weight: normal;
+    font-size: 50px;
+    letter-spacing: -1px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+#forecast {
+    position: absolute;
+    left: 0;
+    top: 54px;
+    width: 280px;
+    height: 112px;
+    overflow: hidden;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    -webkit-transition: height 0.3s ease-in-out;
+}
+
+#panel.still, #forecast.still {
+    -webkit-transition: none;
+}
+
+#band {
+    position: absolute;
+    left: 8px;
+    top: 4px;
+    width: 264px;
+    height: 20px;
+}
+
+.day #band { background: rgba(127, 164, 243, 0.17); }
+.night #band { background: rgba(190, 190, 190, 0.17); }
+
+.grid {
+    position: absolute;
+    top: 4px;
+    width: 1px;
+    height: 100px;
+    background: rgba(0, 0, 0, 0.2);
+    box-shadow: 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.column {
+    position: absolute;
+    top: 0;
+    width: 44px;
+    height: 112px;
+}
+
+.dname, .hi, .lo {
+    position: absolute;
+    left: 0;
+    width: 44px;
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+
+.dname {
+    top: 8px;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+}
+
+.mini {
+    position: absolute;
+    left: 0;
+    top: 27px;
+}
+
+.hi {
+    top: 64px;
+    font-size: 17px;
+}
+
+.lo {
+    top: 86px;
+    font-size: 13px;
+}
+
+.day .lo { color: rgb(130, 160, 202); }
+.night .lo { color: rgb(176, 146, 166); }
+
+#infobutton {
+    position: absolute;
+    right: 8px;
+    bottom: 5px;
+    width: 13px;
+    height: 13px;
+    z-index: 3;
+}
+
+/* --- Back ----------------------------------------------------------------------------- */
+
+#back {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 300px;
+    height: 202px;
+}
+
+#linen {
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+#backpanel {
+    position: absolute;
+    left: 8px;
+    top: 38px;
+    width: 284px;
+    height: 150px;
+}
+
+.label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.7);
+}
+
+#placelabel { left: 18px; top: 14px; }
+#unitslabel { left: 200px; top: 14px; }
+
+#place {
+    position: absolute;
+    left: 17px;
+    top: 28px;
+    width: 168px;
+    font: 12px "Lucida Grande";
+}
+
+#units {
+    position: absolute;
+    left: 199px;
+    top: 29px;
+    width: 66px;
+    font: 12px "Lucida Grande";
+}
+
+#status {
+    left: 18px;
+    top: 58px;
+    width: 248px;
+    font-weight: normal;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#matches {
+    display: none;
+    position: absolute;
+    left: 17px;
+    top: 74px;
+    width: 250px;
+    font: 12px "Lucida Grande";
+}
+
+#credit {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.7);
+}
+
+#credit span {
+    color: rgba(255, 255, 255, 0.75);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+#done {
+    position: absolute;
+    right: 16px;
+    bottom: 13px;
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Forecast</title>
+<link rel="stylesheet" type="text/css" href="Forecast.css">
+<script type="text/javascript" src="file:///System/Library/WidgetResources/AppleClasses/AppleAnimator.js" charset="utf-8"></script>
+<script type="text/javascript" src="file:///System/Library/WidgetResources/AppleClasses/AppleButton.js" charset="utf-8"></script>
+<script type="text/javascript" src="file:///System/Library/WidgetResources/AppleClasses/AppleInfoButton.js" charset="utf-8"></script>
+<script type="text/javascript" src="Art.js" charset="utf-8"></script>
+<script type="text/javascript" src="Forecast.js" charset="utf-8"></script>
+</head>
+<body onload="setup();">
+
+<div id="front" class="day">
+    <div id="panel">
+        <div id="cap"></div>
+        <div id="head" onclick="toggleForecast(event);">
+            <div id="high" class="minor"></div>
+            <div id="city"></div>
+            <div id="low" class="minor"></div>
+            <div id="temp">--</div>
+        </div>
+        <div id="forecast" onclick="toggleForecast(event);">
+            <div id="band"></div>
+        </div>
+        <div id="infobutton"></div>
+    </div>
+    <canvas id="art" width="180" height="92"></canvas>
+</div>
+
+<div id="back">
+    <canvas id="linen" width="300" height="202"></canvas>
+    <div id="backpanel">
+        <label for="place" class="label" id="placelabel">City or town:</label>
+        <input id="place" type="text" oninput="placeTyped();" onkeypress="placeKeyPress(event);">
+        <label for="units" class="label" id="unitslabel">Units:</label>
+        <select id="units" onchange="unitsChanged();">
+            <option value="C">&deg;C</option>
+            <option value="F">&deg;F</option>
+        </select>
+        <div id="status" class="label" aria-live="polite"></div>
+        <select id="matches"></select>
+        <div id="credit">Weather data by <span onclick="openCredit(event);">Open-Meteo.com</span></div>
+        <div id="done"></div>
+    </div>
+</div>
+
+</body>
+</html>
