@@ -99,14 +99,14 @@ def chrome_text(text, rect, font, kern):
     """Text like a chrome nameplate: a mirrored gradient with a horizon line, a dark edge and a shadow."""
     w, h = int(rect.size.width), int(rect.size.height)
     letters = flipped_image(w, h, lambda: paint.text(text, NSMakeRect(0, 0, w, h), font, white(1), kern=kern))
-    shine = flipped_image(w, h, lambda: paint.fill(NSMakeRect(0, 0, w, h), ("#ffffff", 0), ("#eef2f6", 0.28),
-                                                        ("#c3cfdb", 0.5), ("#8b9cae", 0.52), ("#d5dee8", 0.78),
-                                                        ("#ffffff", 1)))
+    shine = flipped_image(w, h, lambda: paint.fill(NSMakeRect(0, 0, w, h), ("#ffffff", 0), ("#dfe6ee", 0.3),
+                                                        ("#a3b2c3", 0.5), ("#55687d", 0.53), ("#9fb0c2", 0.75),
+                                                        ("#eef2f6", 1)))
     letters.lockFocusFlipped_(True)
     shine.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
         NSMakeRect(0, 0, w, h), NSZeroRect, NSCompositeSourceIn, 1.0, True, None)
     letters.unlockFocus()
-    for dy, alpha in ((1, 0.55), (-1, 0.35)):     # a dark rim below and above, as if pressed into the body
+    for dy, alpha in ((1, 0.7), (-1, 0.45)):      # a dark rim below and above, as if pressed into the body
         paint.with_shadow(paint.shadow(dy, 0, white(0, alpha)), lambda: letters.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
             rect, NSZeroRect, NSCompositeSourceOver, 1.0, True, None))
     paint.with_shadow(paint.shadow(2, 3, white(0, 0.35)), lambda: letters.drawInRect_fromRect_operation_fraction_respectFlipped_hints_(
@@ -119,8 +119,9 @@ def groove(r, radius):
     paint.stroke(paint.rounded(NSOffsetRect(NSInsetRect(r, -2.5, -2.5), 0, 1), radius + 2.5), white(1, 0.22), 1)
 
 
-def draw_body(w, h):
+def draw_body(w, h, strip_x=STRIP_X, full=True):
     """Blue anodised aluminium, brushed, with light catching its top, and a silver strip on the right."""
+    STRIP_X = strip_x
     body = NSMakeRect(0, 0, STRIP_X, h)
     paint.fill(body, ("#86b5e6", 0), ("#5f93cf", 0.16), ("#4a7ebd", 0.45), ("#3d6dab", 0.8), ("#335f99", 1))
     brushing(body, 7, 0.08, 0.06, 700)
@@ -135,7 +136,8 @@ def draw_body(w, h):
     paint.fill(NSMakeRect(0, 0, w, 1), white(0, 0.5))
     paint.fill(NSMakeRect(0, 1, w, 1), white(1, 0.45))
     paint.fill(NSMakeRect(0, h - 1, w, 1), white(0, 0.3))
-
+    if not full:
+        return
     chrome_text(u"KASSETT", NSMakeRect(16, 10, 200, 40), paint.font("Futura-CondensedExtraBold", 31, True), 2.5)
     paint.text(u"STEREO CASSETTE PLAYER", NSMakeRect(STRIP_X - 18 - 260, 29, 260, 12),
                paint.font("Helvetica-Bold", 8, True), white(1, 0.85), NSRightTextAlignment, kern=2.2,
@@ -651,8 +653,9 @@ class KeyCell(NSButtonCell):
         down = self.isHighlighted()
         accent = getattr(self, "accent", False)
         w = frame.size.width
-        r = NSMakeRect(2, 1 + (1 if down else 0), w - 4, 60)
-        shape = paint.rounded(r, 9)
+        r = NSMakeRect(2, 1 + (1 if down else 0), w - 4, frame.size.height - 6)
+        radius = min(9.0, r.size.height * 0.2)
+        shape = paint.rounded(r, radius)
         paint.with_shadow(paint.shadow(1 if down else 3, 2 if down else 4, white(0, 0.5)),
                           lambda: paint.fill(shape, "#888888"))
         if accent:
@@ -666,24 +669,26 @@ class KeyCell(NSButtonCell):
         paint.fill(shape, *body)
 
         def light():
-            gloss = paint.rounded(NSMakeRect(r.origin.x + 3, r.origin.y + 2, r.size.width - 6, r.size.height * 0.48), 7)
+            gloss = paint.rounded(NSMakeRect(r.origin.x + 3, r.origin.y + 2, r.size.width - 6, r.size.height * 0.48),
+                                  max(2.0, radius - 2))
             paint.fill(gloss, white(1, 0.75 if not down else 0.35), white(1, 0.12))
             paint.fill(NSMakeRect(r.origin.x, r.origin.y + r.size.height - 10, r.size.width, 10), white(1, 0), glow)
         paint.clipped(shape, light)
-        paint.stroke(paint.rounded(NSInsetRect(r, 0.5, 0.5), 8.5), rim, 1)
-        paint.stroke(paint.rounded(NSInsetRect(r, 1.5, 1.5), 7.5), white(1, 0.35 if accent else 0.6), 1)
+        paint.stroke(paint.rounded(NSInsetRect(r, 0.5, 0.5), radius - 0.5), rim, 1)
+        paint.stroke(paint.rounded(NSInsetRect(r, 1.5, 1.5), radius - 1.5), white(1, 0.35 if accent else 0.6), 1)
         if down:
             paint.inner_shadow(shape, 2, 4, white(0, 0.35))
         name = getattr(self, "glyph", "play")
         gw, gh = glyphs.size(name)
+        k = 1.0 if r.size.height > 40 else 0.72
         alpha = 1.0 if self.isEnabled() else 0.35
-        gx, gy = r.origin.x + (r.size.width - gw) / 2.0, r.origin.y + (r.size.height - gh) / 2.0
+        gx, gy = r.origin.x + (r.size.width - gw * k) / 2.0, r.origin.y + (r.size.height - gh * k) / 2.0
         if accent:
-            glyphs.draw_at(name, gx, gy - 1, white(0, 0.3 * alpha))
-            glyphs.draw_at(name, gx, gy, white(1, alpha))
+            glyphs.draw_at(name, gx, gy - 1, white(0, 0.3 * alpha), k)
+            glyphs.draw_at(name, gx, gy, white(1, alpha), k)
         else:
-            glyphs.draw_at(name, gx, gy + 1, white(1, 0.95 * alpha))
-            glyphs.draw_at(name, gx, gy, hexc("#3d3d3d", alpha))
+            glyphs.draw_at(name, gx, gy + 1, white(1, 0.95 * alpha), k)
+            glyphs.draw_at(name, gx, gy, hexc("#3d3d3d", alpha), k)
 
 
 def make_key(parent, frame, glyph, tip, target, action):
@@ -1095,7 +1100,12 @@ class Deck(NSObject):
 
 
 # ---- the mini player ---------------------------------------------------------------------------------
+MINI_STRIP = 286
+
+
 class MiniView(FlippedView):
+    """The player shrunk to a strip: the same blue body and silver key strip, a small cassette."""
+
     def initWithFrame_(self, frame):
         self = super(MiniView, self).initWithFrame_(frame)
         if self:
@@ -1113,91 +1123,57 @@ class MiniView(FlippedView):
     def drawRect_(self, rect):
         b = self.bounds()
         if self.bg is None:
-            self.bg = flipped_image(b.size.width, b.size.height, lambda: draw_brushed(b.size.width, b.size.height))
+            self.bg = flipped_image(b.size.width, b.size.height,
+                                    lambda: draw_body(b.size.width, b.size.height, MINI_STRIP, False))
         draw_part(self.bg, rect, NSCompositeCopy)
         draw_mini_cassette(12, 16, self.angle)
-        x, w = 120, b.size.width - 120 - 160
-        big = paint.font("MarkerFelt-Wide", 17)
-        paint.text(self.title, NSMakeRect(x, 21, w, 22), big, INK)
-        paint.text(self.artist, NSMakeRect(x, 42, w, 20), paint.font("Noteworthy-Bold", 12), "#3a3a3a")
-        track = NSMakeRect(x, 66, w, 4)
-        paint.fill(paint.rounded(NSOffsetRect(track, 0, 1), 2), white(1, 0.8))
-        shape = paint.rounded(track, 2)
-        paint.fill(shape, "#939393")
+        x, w = 122, MINI_STRIP - 122 - 14
+        sh = paint.shadow(-1, 0, white(0, 0.35))
+        paint.text(self.title, NSMakeRect(x, 22, w, 18), paint.ui(13, True), white(1), sh=sh)
+        paint.text(self.artist, NSMakeRect(x, 40, w, 16), paint.ui(11), white(1, 0.85), sh=sh)
+        track = NSMakeRect(x, 64, w, 5)
+        paint.fill(paint.rounded(NSOffsetRect(track, 0, 1), 2.5), white(1, 0.25))
+        shape = paint.rounded(track, 2.5)
+        paint.fill(shape, white(0, 0.35))
         paint.inner_shadow(shape, 1, 1, white(0, 0.5))
         if self.has_track:
-            paint.fill(paint.rounded(NSMakeRect(x, 66, max(4, w * self.p), 4), 2), "#2f2f32")
+            paint.fill(paint.rounded(NSMakeRect(x, 64, max(5, w * self.p), 5), 2.5), "#f6f6f6", "#c9c9c9")
 
 
 def draw_mini_cassette(x, y, angle):
+    """The big cassette's look at 96 x 62: the label's index area, the orange band and two hubs."""
     shell = paint.rounded(NSMakeRect(x, y, 96, 62), 5)
     paint.with_shadow(paint.shadow(1, 3, white(0, 0.6)), lambda: paint.fill(shell, "#222226"))
     paint.fill(shell, "#414146", "#222226")
     paint.clipped(shell, lambda: paint.fill(NSMakeRect(x + 4, y, 88, 1), white(1, 0.2)))
-    lab = paint.rounded(NSMakeRect(x + 6, y + 5, 84, 40), 3)
+    lab = paint.rounded(NSMakeRect(x + 6, y + 5, 84, 42), 3)
 
     def label():
-        paint.fill(NSMakeRect(x + 6, y + 5, 84, 40), "#f6efdb", "#ece2c6")
-        paint.fill(NSMakeRect(x + 6, y + 37, 84, 4), "#e2632e")
-        paint.fill(NSMakeRect(x + 6, y + 41, 84, 4), "#efa13a")
+        paint.fill(NSMakeRect(x + 6, y + 5, 84, 42), "#fbf9f3", "#efebe1")
+        paint.fill(NSMakeRect(x + 10, y + 12, 76, 0.8), hexc("#466eaa", 0.35))
+        paint.fill(NSMakeRect(x + 6, y + 16, 84, 24), "#ee7a36", "#df5f22")
     paint.clipped(lab, label)
-    win = paint.rounded(NSMakeRect(x + 20, y + 14, 56, 20), 4)
-    paint.fill(win, "#241e1a")
+    win = paint.rounded(NSMakeRect(x + 22, y + 18, 52, 20), 5)
+    paint.fill(win, "#2b1d14")
     paint.inner_shadow(win, 1, 2, white(0, 0.8))
-    for cx in (x + 33, x + 63):
+    for cx in (x + 34, x + 62):
         NSGraphicsContext.saveGraphicsState()
         t = NSAffineTransform.transform()
-        t.translateXBy_yBy_(cx, y + 24)
+        t.translateXBy_yBy_(cx, y + 28)
         t.rotateByDegrees_(-angle)
         t.concat()
-        paint.fill(paint.oval(0, 0, 7), "#f3efe6")
-        paint.fill(paint.oval(0, 0, 3.5), "#241e1a")
-        for i in range(3):
+        paint.fill(paint.oval(0, 0, 7.5), "#f1ece0")
+        paint.fill(paint.oval(0, 0, 3.4), "#1a1410")
+        for i in range(6):
             NSGraphicsContext.saveGraphicsState()
             rot = NSAffineTransform.transform()
-            rot.rotateByDegrees_(120 * i)
+            rot.rotateByDegrees_(60 * i)
             rot.concat()
-            paint.fill(NSMakeRect(-0.8, -3.6, 1.6, 2.2), "#f3efe6")
+            paint.fill(NSMakeRect(-0.6, -3.4, 1.2, 1.4), "#f1ece0")
             NSGraphicsContext.restoreGraphicsState()
         NSGraphicsContext.restoreGraphicsState()
-
-
-class SegmentCell(NSButtonCell):
-    """One part of a textured segmented control drawn like the mockup's (left, middle or right)."""
-
-    def drawWithFrame_inView_(self, frame, view):
-        part = getattr(self, "part", "middle")
-        r = NSMakeRect(0, 0, frame.size.width, frame.size.height - 1)
-        rad = {"left": (4, 0, 0, 4), "right": (0, 4, 4, 0), "middle": (0, 0, 0, 0), "single": (4, 4, 4, 4)}[part]
-        outline = paint.corners(r, *rad)
-        paint.fill(paint.corners(NSOffsetRect(r, 0, 1), *rad), white(1, 0.5))
-        paint.fill(outline, "#7b7b7b")
-        inner_r = NSMakeRect(1 if part in ("left", "single") else 0, 1,
-                             r.size.width - (1 if part in ("left", "single") else 0) - 1, r.size.height - 2)
-        inner = paint.corners(inner_r, *[max(0, v - 1) for v in rad])
-        if self.isHighlighted():
-            paint.fill(inner, "#bdbdbd", "#a8a8a8")
-        else:
-            paint.fill(inner, "#f6f6f6", "#cfcfcf")
-            paint.clipped(inner, lambda: paint.fill(NSMakeRect(0, 1, r.size.width, 1), white(1, 0.9)))
-        name = getattr(self, "glyph", "play")
-        gw, gh = glyphs.size(name)
-        scale = getattr(self, "scale", 1.0)
-        glyphs.draw(name, NSMakeRect((r.size.width - gw * scale) / 2.0, (r.size.height - gh * scale) / 2.0,
-                                     gw * scale, gh * scale), hexc("#333333", 1 if self.isEnabled() else 0.4))
-
-
-def make_segment(parent, frame, glyph, part, scale, tip, target, action):
-    b = KeyButton.alloc().initWithFrame_(frame)
-    cell = SegmentCell.alloc().init()
-    cell.glyph, cell.part, cell.scale = glyph, part, scale
-    cell.setButtonType_(NSMomentaryChangeButton)
-    b.setCell_(cell)
-    b.setToolTip_(tip)
-    b.setTarget_(target)
-    b.setAction_(action)
-    parent.addSubview_(b)
-    return b
+    for sx_, sy_ in ((x + 4, y + 4), (x + 92, y + 4), (x + 4, y + 58), (x + 92, y + 58)):
+        paint.fill(paint.oval(sx_, sy_, 1.6), "#9a9a9a")
 
 
 class Mini(NSObject):
@@ -1209,7 +1185,7 @@ class Mini(NSObject):
         self.timer = None
         self.playing = False
         p = NSPanel.alloc().initWithContentRect_styleMask_backing_defer_(
-            NSMakeRect(0, 0, 460, 94), NSTitledWindowMask | NSClosableWindowMask | NSUtilityWindowMask,
+            NSMakeRect(0, 0, MINI_STRIP + 190, 94), NSTitledWindowMask | NSClosableWindowMask | NSUtilityWindowMask,
             NSBackingStoreBuffered, False)
         p.setTitle_(u"Kassett")
         p.setFloatingPanel_(False)
@@ -1221,15 +1197,12 @@ class Mini(NSObject):
         p.setDelegate_(self)
         self.view = MiniView.alloc().initWithFrame_(p.contentView().bounds())
         p.contentView().addSubview_(self.view)
-        y = (94 - 24) / 2
-        self.prevButton = make_segment(self.view, NSMakeRect(300, y, 33, 25), "prev", "left", 0.64,
-                                       u"Previous song", app, "previous:")
-        self.playButton = make_segment(self.view, NSMakeRect(333, y, 36, 25), "play", "middle", 0.75,
-                                       u"Play or pause", app, "playPause:")
-        self.nextButton = make_segment(self.view, NSMakeRect(369, y, 32, 25), "next", "right", 0.64,
-                                       u"Next song", app, "next:")
-        self.expandButton = make_segment(self.view, NSMakeRect(420, y, 28, 25), "expand", "single", 1.0,
-                                         u"Show the cassette deck", app, "showDeck:")
+        x, y = MINI_STRIP + 12, 26
+        self.prevButton = make_key(self.view, NSMakeRect(x, y, 40, 42), "prev", u"Previous song", app, "previous:")
+        self.playButton = make_key(self.view, NSMakeRect(x + 42, y, 44, 42), "play", u"Play or pause", app, "playPause:")
+        self.nextButton = make_key(self.view, NSMakeRect(x + 88, y, 40, 42), "next", u"Next song", app, "next:")
+        self.expandButton = make_key(self.view, NSMakeRect(x + 134, y + 6, 30, 30), "expand",
+                                     u"Show the cassette player", app, "showDeck:")
         self.window = p
         return self
 
@@ -1239,6 +1212,7 @@ class Mini(NSObject):
         v.setNeedsDisplay_(True)
         self.playing = playing
         self.playButton.cell().glyph = "pause" if playing else "play"
+        self.playButton.cell().accent = playing
         self.playButton.setNeedsDisplay_(True)
         controllable = getattr(self.app, "controllable", True)
         for b in (self.prevButton, self.nextButton):

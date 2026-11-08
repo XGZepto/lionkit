@@ -1,51 +1,38 @@
 # -*- coding: utf-8 -*-
-"""Kassett icon (until the cassette icon lands): a glossy iTunes-10-style green disc with a play symbol and remote waves."""
+"""Kassett's icon: the player's black cassette with its orange-banded label, tilted, with its edge
+showing and a soft shadow, drawn with the same code as the cassette in the app."""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [HERE, os.path.dirname(os.path.dirname(HERE))]   # the app's modules and lionkit
+
 from AppKit import *  # noqa: F401,F403
 
-
-def c(r, g, b, a=1.0):
-    return NSColor.colorWithCalibratedRed_green_blue_alpha_(r / 255.0, g / 255.0, b / 255.0, a)
+import deck
+import paint
 
 
 def render(path, size):
-    s = size / 512.0
     img = NSImage.alloc().initWithSize_(NSMakeSize(size, size))
-    img.lockFocus()
-    disc_rect = NSMakeRect(40 * s, 40 * s, 432 * s, 432 * s)
-    disc = NSBezierPath.bezierPathWithOvalInRect_(disc_rect)
-    shadow = NSShadow.alloc().init()
-    shadow.setShadowOffset_(NSMakeSize(0, -10 * s))
-    shadow.setShadowBlurRadius_(18 * s)
-    shadow.setShadowColor_(NSColor.colorWithCalibratedWhite_alpha_(0, 0.5))
-    NSGraphicsContext.saveGraphicsState()
-    shadow.set()
-    c(20, 120, 60).set()
-    disc.fill()
-    NSGraphicsContext.restoreGraphicsState()
-    NSGradient.alloc().initWithStartingColor_endingColor_(c(110, 220, 120), c(18, 110, 52)).drawInBezierPath_angle_(disc, -90)
-    rim = NSBezierPath.bezierPathWithOvalInRect_(NSInsetRect(disc_rect, 6 * s, 6 * s))
-    rim.setLineWidth_(4 * s)
-    c(255, 255, 255, 0.35).set()
-    rim.stroke()
-
-    play = NSBezierPath.bezierPath()
-    play.moveToPoint_(NSMakePoint(196 * s, 168 * s))
-    play.lineToPoint_(NSMakePoint(196 * s, 344 * s))
-    play.lineToPoint_(NSMakePoint(334 * s, 256 * s))
-    play.closePath()
-    c(255, 255, 255).set()
-    play.fill()
-
-    for i, radius in enumerate((70, 110)):
-        arc = NSBezierPath.bezierPath()
-        arc.appendBezierPathWithArcWithCenter_radius_startAngle_endAngle_(NSMakePoint(330 * s, 256 * s), radius * s, -38, 38)
-        arc.setLineWidth_(16 * s)
-        arc.setLineCapStyle_(NSRoundLineCapStyle)
-        c(255, 255, 255, 0.85 - i * 0.3).set()
-        arc.stroke()
-
-    gloss = NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(86 * s, 250 * s, 340 * s, 200 * s))
-    NSGradient.alloc().initWithStartingColor_endingColor_(c(255, 255, 255, 0.55), c(255, 255, 255, 0.0)).drawInBezierPath_angle_(gloss, -90)
+    img.lockFocusFlipped_(True)
+    s = size / 512.0
+    t = NSAffineTransform.transform()
+    t.scaleBy_(s)
+    t.translateXBy_yBy_(256, 262)
+    t.rotateByDegrees_(-9)
+    t.scaleBy_(0.98)
+    t.translateXBy_yBy_(-200, -126)
+    t.concat()
+    shell = paint.rounded(NSMakeRect(0, 0, 400, 252), 12)
+    edge = paint.rounded(NSMakeRect(0, 12, 400, 252), 12)          # the cassette's thickness, below its face
+    paint.with_shadow(paint.shadow(14, 22, paint.white(0, 0.55)), lambda: paint.fill(edge, "#141416"))
+    paint.fill(edge, "#2c2c30", "#0e0e10")
+    deck.draw_cassette(0, 0, "black", u"Kassett", u"Side A — my favorite songs", 0.42)
+    for (hx, hy), angle in zip(deck.HUB_XY, (14, 47)):
+        deck.draw_hub(hx, hy, angle)
+    paint.clipped(shell, lambda: paint.gradient((paint.white(1, 0.30), 0), (paint.white(1, 0.06), 0.45),
+                                                (paint.white(1, 0), 0.46)).drawInRect_angle_(NSMakeRect(0, 0, 400, 252), 65))
     img.unlockFocus()
     rep = NSBitmapImageRep.alloc().initWithData_(img.TIFFRepresentation())
     rep.representationUsingType_properties_(NSPNGFileType, None).writeToFile_atomically_(path, True)
