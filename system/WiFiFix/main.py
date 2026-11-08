@@ -13,8 +13,6 @@ from __future__ import print_function
 
 import math
 import os
-import shutil
-import subprocess
 import sys
 import time
 
@@ -37,10 +35,6 @@ BACKOFF = (30, 60, 120, 300)  # after 1, 2, 3, 4+ failed joins in a row
 MENU_W = 290
 ROW_H = 19
 NO_PASSWORD = 3
-# Where wififix.sh installed itself. WiFiFix only checks that the plist exists and can remove both;
-# it never reads the folder, which holds the old helper's password in a plain file.
-OLD_PLIST = os.path.expanduser("~/Library/LaunchAgents/local.wififix.plist")
-OLD_DIR = os.path.expanduser("~/Library/WiFiFix")
 
 
 def log(*parts):
@@ -796,8 +790,6 @@ class WiFiFix(NSObject):
                 self.add(forget, name, "forget:", name)
             m.addItemWithTitle_action_keyEquivalent_(u"Forget Network", None, u"").setSubmenu_(forget)
         m.addItem_(NSMenuItem.separatorItem())
-        if self.oldHelperInstalled():
-            self.add(m, u"Remove the Old wififix.sh Helper…", "removeOldHelper:")
         self.add(m, u"Open at Login", "toggleLogin:").setState_(NSOnState if self.login_items.enabled() else NSOffState)
         self.add(m, u"Open Network Preferences…", "openNetworkPreferences:")
         m.addItem_(NSMenuItem.separatorItem())
@@ -929,45 +921,6 @@ class WiFiFix(NSObject):
     def about_(self, sender):
         NSApp.activateIgnoringOtherApps_(True)
         NSApp.orderFrontStandardAboutPanel_(None)
-
-    # ---- the old wififix.sh helper -------------------------------------------------------------
-    def oldHelperInstalled(self):
-        return self.defaults.boolForKey_("DemoOldHelper") if self.demo else os.path.exists(OLD_PLIST)
-
-    def removeOldHelper_(self, sender):
-        names = self.store.networks()
-        proven = [n for n in names if self.store.verified(n)]
-        alert = NSAlert.alloc().init()
-        alert.setMessageText_(u"Remove the old wififix.sh helper?")
-        tail = (u" Removing it also deletes the file where it kept your Wi-Fi password in plain text. "
-                u"WiFiFix keeps passwords in your keychain instead.")
-        if proven:
-            alert.setInformativeText_(u"WiFiFix has already rejoined %s by itself, so the old helper isn't "
-                                      u"needed anymore." % names_text(proven) + tail)
-            alert.addButtonWithTitle_(u"Remove")
-            alert.addButtonWithTitle_(u"Cancel")
-            remove = NSAlertFirstButtonReturn
-        elif names:
-            alert.setInformativeText_(u"WiFiFix hasn't rejoined %s yet, so the saved password isn't proven to "
-                                      u"work. Choose “Rejoin Now” in the WiFiFix menu first." % names_text(names) + tail)
-            alert.addButtonWithTitle_(u"Cancel")
-            alert.addButtonWithTitle_(u"Remove Anyway")
-            remove = NSAlertSecondButtonReturn
-        else:
-            alert.setInformativeText_(u"Choose your network in the WiFiFix menu and enter its password first. "
-                                      u"Otherwise nothing will rejoin it when the connection drops.")
-            alert.addButtonWithTitle_(u"OK")
-            remove = None
-        NSApp.activateIgnoringOtherApps_(True)
-        if alert.runModal() != remove or self.demo:
-            return
-        subprocess.call(["/bin/launchctl", "unload", OLD_PLIST], stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
-        try:
-            os.remove(OLD_PLIST)
-            shutil.rmtree(OLD_DIR, ignore_errors=True)
-            log("removed the old wififix.sh helper")
-        except OSError as e:
-            log("couldn't remove the old helper:", e)
 
     # ---- the join dialog -----------------------------------------------------------------------
     def openPanel(self, mode, ssid, kind, activate=True):

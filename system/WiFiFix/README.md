@@ -13,10 +13,9 @@ so it opens as a login item, not as a LaunchAgent started over SSH.
 | File | What it holds |
 |---|---|
 | `main.py` | The status item, the menu, the join dialog, and the rejoin logic (poll every 5 s, give Lion 8 s first, back off 30 s → 5 min after failures) |
-| `wifi.py` | CoreWLAN: status, scan, network classification, and the join trick (unchanged from `wififix.sh`) |
+| `wifi.py` | CoreWLAN: status, scan, network classification, and the join trick |
 | `art.py` | The menu bar key, lock, signal fan and status lights |
 | `icon.py` | The app icon: a brass key whose bow is the Wi-Fi fan |
-| `wififix.sh` | The old LaunchAgent script, kept until every Mac has moved to the app |
 
 ```bash
 tools/deploy.sh system/WiFiFix
@@ -35,17 +34,4 @@ ssh lionmac defaults write page.zepto.wififix DebugOpen preview  # or join, erro
 ```
 
 `DebugOpen preview` opens a window with the menu's custom rows, because an open menu can't be
-captured over SSH. `DemoJoinSeconds` sets how long a fake join takes, and `DemoOldHelper` shows
-the "Remove the Old wififix.sh Helper…" item.
-
-## Moving a Mac from wififix.sh to the app
-
-1. Open WiFiFix, choose your network in its menu and type the password. Because the Mac is
-   already connected, the dialog only saves the password.
-2. Choose "Rejoin “…” Now". The Mac drops off Wi-Fi for a few seconds and WiFiFix rejoins it
-   with the saved password. If that fails, the old helper still rejoins within 30 seconds.
-3. Choose "Remove the Old wififix.sh Helper…". It unloads `local.wififix` and deletes its plist
-   and `~/Library/WiFiFix`, which holds the password in plain text.
-
-On a case-insensitive disk, WiFiFix's log (`~/Library/Logs/WiFiFix.log`) is the same file as the
-old helper's `wififix.log`, so the two are mixed until the helper is removed.
+captured over SSH. `DemoJoinSeconds` sets how long a fake join takes.

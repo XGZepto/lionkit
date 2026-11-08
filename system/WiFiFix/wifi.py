@@ -4,7 +4,7 @@
 Lion reads a WPA2/WPA3 "transition" network's RSN element, finds WPA3's SAE key management next to
 WPA2-PSK, and files the network under "WPA2 Enterprise", so it never joins it. Before joining,
 WiFiFix rewrites the network's scan record so it offers only WPA2-PSK, which the access point
-still accepts from WPA2 clients. (This is the join logic of the old wififix.sh, unchanged.)
+still accepts from WPA2 clients.
 
 scan() and join() block for seconds: run them through lionkit.cocoa.in_background. status() is
 cheap and belongs on the main thread. Demo is a stand-in with made-up networks, for screenshots."""
