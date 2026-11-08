@@ -1,0 +1,28 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-08T08:34:00Z"},
+  "title": "Kassett",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 860, "h": 580, "title": "Now Playing — cassette deck", "is_interactive": true},
+    "UpNext.dc.html": {"x": 940, "y": 0, "w": 860, "h": 580, "title": "Up Next popover"},
+    "Devices.dc.html": {"x": 1880, "y": 0, "w": 860, "h": 580, "title": "Devices menu (AirPlay-style)"},
+    "Mini.dc.html": {"x": 2820, "y": 0, "w": 540, "h": 190, "title": "Mini player", "is_interactive": true},
+    "Browser.dc.html": {"x": 0, "y": 980, "w": 1140, "h": 740, "title": "Library — Albums", "is_interactive": true},
+    "Playlist.dc.html": {"x": 1220, "y": 980, "w": 1140, "h": 740, "title": "Playlist", "is_interactive": true},
+    "Album.dc.html": {"x": 2440, "y": 980, "w": 1140, "h": 740, "title": "Album", "is_interactive": true},
+    "Artist.dc.html": {"x": 3660, "y": 980, "w": 1140, "h": 740, "title": "Artist", "is_interactive": true},
+    "Search.dc.html": {"x": 0, "y": 1840, "w": 1140, "h": 740, "title": "Search", "is_interactive": true},
+    "Artists.dc.html": {"x": 1220, "y": 1840, "w": 1140, "h": 740, "title": "Artists", "is_interactive": true},
+    "Liked.dc.html": {"x": 2440, "y": 1840, "w": 1140, "h": 740, "title": "Liked Songs", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "UpNext.dc.html", "Devices.dc.html", "Mini.dc.html", "Browser.dc.html", "Playlist.dc.html", "Album.dc.html", "Artist.dc.html", "Search.dc.html", "Artists.dc.html", "Liked.dc.html"],
+  "notes": {
+    "deckTitle": {"x": 0, "y": -300, "text": "Now Playing: the cassette deck", "kind": "title1", "maxW": 3360},
+    "browserTitle": {"x": 0, "y": 680, "text": "The library browser (the ⏏ key opens it)", "kind": "title1", "maxW": 4800},
+    "apiNote": {"x": 3660, "y": 1840, "w": 420, "text": "Built only on Web API endpoints new apps can still use: playback, devices, queue, library, playlists, albums, artists (top tracks + albums), search. No recommendations, related artists, audio features or Spotify-made playlists (restricted since Nov 2024).\n\nPlayback control needs Premium. Artwork is cached as small JPEGs; lists load 50 rows at a time to respect 2 GB of RAM."},
+    "deckNote": {"x": 3440, "y": 0, "w": 420, "text": "Deck: the reels turn while playing and the right reel fills as the song progresses. Piano keys latch (PLAY or PAUSE stays down). Turn the knob for volume. The time is a mechanical counter. ⏏ ejects to the library browser. Up Next and AirPlay sit in the bottom bar like iTunes 10."}
+  },
+  "designSystems": []
+}

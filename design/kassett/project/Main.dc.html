@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kassett — Now Playing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&amp;family=Kalam:wght@400;700&amp;family=Open+Sans:wght@400;600;700&amp;family=Permanent+Marker&amp;display=swap">
+<style>
+body{margin:0}
+@keyframes reelspin{to{transform:rotate(-360deg)}}
+.reel{transform-origin:50% 50%}
+.reel.on{animation:reelspin 2.4s linear infinite}
+</style>
+</helmet>
+<div style="width: 860px; height: 580px; box-sizing: border-box; padding: 40px; background-color: #3b3f46; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.09) 0px, rgba(0,0,0,0.09) 1px, transparent 1px, transparent 3px), radial-gradient(ellipse at 50% 35%, #4c5159, #2c3036); font-family: 'Lucida Grande', 'Lucida Sans Unicode', 'Open Sans', Verdana, sans-serif; color: #2b2b2b;">
+<div style="width: 780px; height: 500px; border-radius: 5px 5px 4px 4px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 22px 46px rgba(0,0,0,0.55);">
+
+<div style="height: 22px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #ececec, #d4d4d4); border-bottom: 1px solid #9c9c9c; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);">
+<div style="position: absolute; left: 8px; top: 5px; display: flex; gap: 8px;">
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffc2b8 0%, #f2584c 45%, #b8281e 100%); box-shadow: 0 0 0 0.5px #8e2a22, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffe9b3 0%, #f4bf3a 45%, #b9840f 100%); box-shadow: 0 0 0 0.5px #946a13, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #d3f5b8 0%, #6cc84a 45%, #3a8a22 100%); box-shadow: 0 0 0 0.5px #3a7524, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+</div>
+<span style="font-size: 13px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.7);">Kassett</span>
+</div>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 18px 22px 16px; background-color: #c8c8c8; background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 1px, rgba(0,0,0,0.04) 1px, rgba(0,0,0,0.04) 2px, transparent 2px, transparent 4px), repeating-linear-gradient(180deg, rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 3px, rgba(255,255,255,0.05) 3px, rgba(255,255,255,0.05) 7px), linear-gradient(180deg, #e0e0e0, #b7b7b7); box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);">
+
+<div style="display: flex; gap: 22px; height: 284px;">
+
+<div style="position: relative; width: 452px; height: 284px; flex-shrink: 0; border-radius: 10px; background: linear-gradient(180deg, #17181b, #26282c); box-shadow: inset 0 3px 10px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center;">
+
+<div style="position: relative; width: 400px; height: 252px; border-radius: 12px; background: {{shellBg}}; box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 4px rgba(0,0,0,0.35), 0 3px 10px rgba(0,0,0,0.7);">
+<span style="position: absolute; left: 9px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+<span style="position: absolute; right: 9px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+<span style="position: absolute; left: 9px; bottom: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+<span style="position: absolute; right: 9px; bottom: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+
+<div style="position: absolute; left: 22px; top: 16px; width: 356px; height: 162px; border-radius: 5px; overflow: hidden; background: linear-gradient(180deg, #f6efdb, #ece2c6); box-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+<div style="position: absolute; left: 0; right: 0; top: 30px; height: 1px; background: rgba(70,110,170,0.28);"></div>
+<div style="position: absolute; left: 0; right: 0; top: 54px; height: 1px; background: rgba(70,110,170,0.28);"></div>
+<div style="position: absolute; left: 12px; top: 8px; width: 26px; height: 26px; border: 2px solid #2d2d2d; border-radius: 4px; display: flex; align-items: center; justify-content: center; font: 700 20px/1 Arimo, Helvetica, Arial, sans-serif; color: #2d2d2d;">A</div>
+<div style="position: absolute; left: 50px; right: 14px; top: 3px; font: 400 22px/30px 'Permanent Marker', cursive; color: #26337f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The Lion's Roar</div>
+<div style="position: absolute; left: 52px; right: 14px; top: 33px; font: 400 15px/20px Kalam, cursive; color: #26337f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">First Aid Kit — The Lion's Roar (2012)</div>
+
+<div style="position: absolute; left: 68px; top: 64px; width: 220px; height: 62px; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #3a322d, #1e1916); box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 0 2px #d9cfb4;">
+<div style="position: absolute; border-radius: 50%; left: {{lpx}}px; top: {{lpy}}px; width: {{lp}}px; height: {{lp}}px; background: repeating-radial-gradient(circle, #5d3d25 0px, #5d3d25 1px, #4a2f1b 1px, #4a2f1b 2px);"></div>
+<div style="position: absolute; border-radius: 50%; left: {{rpx}}px; top: {{rpy}}px; width: {{rp}}px; height: {{rp}}px; background: repeating-radial-gradient(circle, #5d3d25 0px, #5d3d25 1px, #4a2f1b 1px, #4a2f1b 2px);"></div>
+<svg class="{{spin}}" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" style="position: absolute; left: 37px; top: 13px;"><circle cx="18" cy="18" r="17" fill="#f3efe6" stroke="#b9b1a0" stroke-width="1"></circle><circle cx="18" cy="18" r="8.5" fill="#241e1a"></circle><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(60 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(120 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(180 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(240 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(300 18 18)"></rect><circle cx="18" cy="4.5" r="1.6" fill="#cfc6b3"></circle><circle cx="18" cy="31.5" r="1.6" fill="#cfc6b3"></circle></svg>
+<svg class="{{spin}}" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" style="position: absolute; left: 147px; top: 13px;"><circle cx="18" cy="18" r="17" fill="#f3efe6" stroke="#b9b1a0" stroke-width="1"></circle><circle cx="18" cy="18" r="8.5" fill="#241e1a"></circle><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(60 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(120 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(180 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(240 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(300 18 18)"></rect><circle cx="18" cy="4.5" r="1.6" fill="#cfc6b3"></circle><circle cx="18" cy="31.5" r="1.6" fill="#cfc6b3"></circle></svg>
+<div style="position: absolute; left: 0; right: 0; top: 0; height: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0));"></div>
+</div>
+
+<div style="position: absolute; left: 300px; top: 70px; font: 700 10px/1 Arimo, Helvetica, Arial, sans-serif; color: #6b5f48; letter-spacing: 1px;">C60</div>
+<div style="position: absolute; left: 14px; top: 74px; font: 700 10px/1 Arimo, Helvetica, Arial, sans-serif; color: #6b5f48; letter-spacing: 1px;">NR ☐</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 30px; background: linear-gradient(180deg, #e2632e 0%, #e2632e 33%, #efa13a 33%, #efa13a 66%, #e8d39e 66%, #e8d39e 100%);"></div>
+</div>
+
+<div style="position: absolute; left: 72px; bottom: 0; width: 256px; height: 56px; clip-path: polygon(9% 0, 91% 0, 100% 100%, 0 100%); background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.3)); display: flex; align-items: center; justify-content: center; gap: 30px;">
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+<span style="width: 14px; height: 10px; border-radius: 2px; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+<span style="width: 14px; height: 10px; border-radius: 2px; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+</div>
+</div>
+
+<div style="position: absolute; inset: 0; border-radius: 10px; background: linear-gradient(155deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.03) 38%, rgba(255,255,255,0) 60%); pointer-events: none;"></div>
+</div>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 2px;">
+<div style="position: relative; width: 178px; height: 178px; background: linear-gradient(135deg, #f0c25a 0%, #d27a33 55%, #8f3b1f 100%); box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 3px 8px rgba(0,0,0,0.45); overflow: hidden;">
+<div style="position: absolute; left: 14px; right: 14px; bottom: 16px; font: 700 21px/1.05 Arimo, Helvetica, Arial, sans-serif; color: #fff8ec; text-shadow: 0 1px 2px rgba(0,0,0,0.35); letter-spacing: -0.3px;">THE LION'S ROAR</div>
+<div style="position: absolute; left: 14px; top: 14px; font: 400 11px/1 Arimo, Helvetica, Arial, sans-serif; color: rgba(255,248,236,0.9); letter-spacing: 2px;">FIRST AID KIT</div>
+<div style="position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 45%);"></div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+<span style="font: 700 9px/1 'Open Sans', sans-serif; letter-spacing: 1.5px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.8);">TAPE COUNTER</span>
+<div style="display: flex; align-items: center; gap: 2px; padding: 5px 7px; border-radius: 5px; background: #111214; box-shadow: inset 0 2px 4px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.85);">
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">{{d0}}</span>
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">{{d1}}</span>
+<span style="width: 8px; text-align: center; font: 700 20px/1 Arimo, Helvetica, Arial, sans-serif; color: #c9c4b8;">:</span>
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">{{d3}}</span>
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">{{d4}}</span>
+</div>
+<span style="font-size: 11px; color: #3f3f3f; text-shadow: 0 1px 0 rgba(255,255,255,0.75);">{{remaining}} remaining</span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 10px; width: 452px;">
+<span style="font-size: 10px; color: #3f3f3f; text-shadow: 0 1px 0 rgba(255,255,255,0.75); width: 30px;">{{elapsed}}</span>
+<div style="position: relative; flex-grow: 1; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #8b8b8b, #a9a9a9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.85);">
+<div style="position: absolute; left: 0; top: 0; bottom: 0; width: {{pct}}%; border-radius: 3px; background: linear-gradient(180deg, #4b4b4f, #2b2b2e);"></div>
+<span style="position: absolute; top: -5px; left: calc({{pct}}% - 8px); width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ffffff, #c4c4c4 70%, #a3a3a3); box-shadow: 0 1px 2px rgba(0,0,0,0.55), inset 0 -1px 0 rgba(0,0,0,0.15);"></span>
+</div>
+<span style="font-size: 10px; color: #3f3f3f; text-shadow: 0 1px 0 rgba(255,255,255,0.75); width: 30px; text-align: right;">{{total}}</span>
+</div>
+
+<div style="display: flex; align-items: flex-end; gap: 18px;">
+<div style="display: flex; gap: 2px; padding: 0 4px 4px; border-radius: 0 0 7px 7px; background: #1c1d20; box-shadow: inset 0 2px 3px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.85);">
+<button aria-label="Previous track" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><rect x="1" y="1" width="2.5" height="12" fill="currentColor"></rect><path d="M12 1 L4 7 L12 13 Z" fill="currentColor"></path><path d="M21 1 L13 7 L21 13 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">PREV</span>
+</button>
+<button aria-label="Rewind 15 seconds" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><path d="M10 1 L1 7 L10 13 Z" fill="currentColor"></path><path d="M19 1 L10 7 L19 13 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">REW</span>
+</button>
+<button aria-label="Play" onClick="{{play}}" style="width: 66px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #2f2f2f; transform: {{playT}}; background: {{playBg}}; box-shadow: {{playSh}};">
+<svg width="14" height="16" viewBox="0 0 14 16" aria-hidden="true"><path d="M1 1 L13 8 L1 15 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">PLAY</span>
+</button>
+<button aria-label="Pause" onClick="{{pause}}" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; transform: {{pauseT}}; background: {{pauseBg}}; box-shadow: {{pauseSh}};">
+<svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" fill="currentColor"></rect><rect x="7.5" y="1" width="3.5" height="12" fill="currentColor"></rect></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">PAUSE</span>
+</button>
+<button aria-label="Fast forward 15 seconds" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><path d="M1 1 L10 7 L1 13 Z" fill="currentColor"></path><path d="M10 1 L19 7 L10 13 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">FF</span>
+</button>
+<button aria-label="Next track" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M1 1 L9 7 L1 13 Z" fill="currentColor"></path><path d="M10 1 L18 7 L10 13 Z" fill="currentColor"></path><rect x="18.5" y="1" width="2.5" height="12" fill="currentColor"></rect></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">NEXT</span>
+</button>
+</div>
+
+<a href="Browser.dc.html" aria-label="Eject: open the library" style="width: 62px; height: 62px; margin-bottom: 4px; border-radius: 6px; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.35), 0 2px 3px rgba(0,0,0,0.35);">
+<svg width="16" height="15" viewBox="0 0 16 15" aria-hidden="true"><path d="M8 1 L15 9 L1 9 Z" fill="currentColor"></path><rect x="1" y="11" width="14" height="3" fill="currentColor"></rect></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">LIBRARY</span>
+</a>
+
+<div style="flex-grow: 1;"></div>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-right: 34px;">
+<div style="position: relative; width: 74px; height: 74px; border-radius: 50%; background: linear-gradient(180deg, #8c8c8c, #e8e8e8); box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.6);">
+<div style="position: absolute; left: 4px; top: 4px; width: 66px; height: 66px; border-radius: 50%; background: conic-gradient(#efefef, #b2b2b2 12%, #f7f7f7 25%, #a8a8a8 38%, #ededed 50%, #b0b0b0 62%, #f5f5f5 75%, #a9a9a9 88%, #efefef); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);"></div>
+<div style="position: absolute; left: 4px; top: 4px; width: 66px; height: 66px; transform: rotate({{knobDeg}}deg);">
+<span style="position: absolute; left: 30px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: #2f2f2f; box-shadow: 0 1px 0 rgba(255,255,255,0.8);"></span>
+</div>
+</div>
+<span style="font: 700 9px/1 'Open Sans', sans-serif; letter-spacing: 1.5px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.8);">VOLUME {{volume}}</span>
+</div>
+</div>
+</div>
+
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: linear-gradient(180deg, #d2d2d2, #a9a9a9); border-top: 1px solid #7e7e7e; box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);">
+<svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true"><rect x="4.5" y="1.5" width="9" height="15" rx="1.6" fill="none" stroke="#3d3d3d" stroke-width="1.5"></rect><circle cx="9" cy="11" r="2.6" fill="none" stroke="#3d3d3d" stroke-width="1.3"></circle><circle cx="9" cy="5" r="1" fill="#3d3d3d"></circle></svg>
+<span style="font-size: 11px; color: #2f2f2f; text-shadow: 0 1px 0 rgba(255,255,255,0.55);">Playing on Living Room · Spotify Premium</span>
+<div style="flex-grow: 1;"></div>
+<a href="UpNext.dc.html" aria-label="Up Next" style="width: 32px; height: 21px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); box-shadow: 0 0 0 1px #7b7b7b, inset 0 1px 0 #ffffff, 0 1px 0 rgba(255,255,255,0.4);">
+<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="1" width="2" height="2" fill="#3d3d3d"></rect><rect x="4" y="1" width="10" height="2" fill="#3d3d3d"></rect><rect x="0" y="5" width="2" height="2" fill="#3d3d3d"></rect><rect x="4" y="5" width="10" height="2" fill="#3d3d3d"></rect><rect x="0" y="9" width="2" height="2" fill="#3d3d3d"></rect><rect x="4" y="9" width="10" height="2" fill="#3d3d3d"></rect></svg>
+</a>
+<a href="Devices.dc.html" aria-label="Choose where Spotify plays" style="width: 32px; height: 21px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); box-shadow: 0 0 0 1px #7b7b7b, inset 0 1px 0 #ffffff, 0 1px 0 rgba(255,255,255,0.4);">
+<svg width="16" height="15" viewBox="0 0 18 17" aria-hidden="true"><path d="M5.5 12.5 H2.5 V1.5 H15.5 V12.5 H12.5" fill="none" stroke="#3d3d3d" stroke-width="1.6" stroke-linejoin="round"></path><path d="M4.5 16.5 H13.5 L9 10.5 Z" fill="#3d3d3d"></path></svg>
+</a>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"playing":{"editor":"boolean","default":true},"progress":{"editor":"range","default":42,"min":0,"max":100,"step":1,"unit":"%"},"volume":{"editor":"range","default":64,"min":0,"max":100,"step":1},"shell":{"editor":"enum","default":"black","options":["black","smoke","white"]},"$preview":{"width":860,"height":580}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var st = this.state || {};
+    var playing = st.playing !== undefined ? st.playing : (this.props.playing !== undefined ? this.props.playing : true);
+    var pct = this.props.progress !== undefined ? this.props.progress : 42;
+    var p = Math.max(0, Math.min(100, pct)) / 100;
+    var vol = this.props.volume !== undefined ? this.props.volume : 64;
+    var shells = {
+      black: 'linear-gradient(180deg, #414146, #222226)',
+      smoke: 'linear-gradient(180deg, #6d737b, #3b4047)',
+      white: 'linear-gradient(180deg, #f2efe8, #d5d0c3)'
+    };
+    var duration = 245;
+    var elapsed = Math.round(duration * p);
+    function mmss(s) { var m = Math.floor(s / 60), r = s % 60; return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r; }
+    function short(s) { var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
+    var t = mmss(elapsed);
+    var lp = Math.round(40 + 70 * (1 - p));
+    var rp = Math.round(40 + 70 * p);
+    var up = 'none';
+    var upBg = 'linear-gradient(180deg, #fbfbfb, #cdcdcd)';
+    var upSh = 'inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5)';
+    var down = 'translateY(3px)';
+    var downBg = 'linear-gradient(180deg, #c9c9c9, #b4b4b4)';
+    var downSh = 'inset 0 2px 4px rgba(0,0,0,0.35), 0 0 0 rgba(0,0,0,0)';
+    var self = this;
+    return {
+      spin: playing ? 'reel on' : 'reel',
+      shellBg: shells[this.props.shell] || shells.black,
+      lp: lp, lpx: 55 - lp / 2, lpy: 31 - lp / 2,
+      rp: rp, rpx: 165 - rp / 2, rpy: 31 - rp / 2,
+      d0: t.charAt(0), d1: t.charAt(1), d3: t.charAt(3), d4: t.charAt(4),
+      remaining: '−' + short(duration - elapsed),
+      elapsed: short(elapsed), total: short(duration),
+      pct: Math.round(p * 1000) / 10,
+      volume: vol,
+      knobDeg: -135 + 270 * vol / 100,
+      playT: playing ? down : up, playBg: playing ? downBg : upBg, playSh: playing ? downSh : upSh,
+      pauseT: playing ? up : down, pauseBg: playing ? upBg : downBg, pauseSh: playing ? upSh : downSh,
+      play: function () { self.setState({ playing: true }); },
+      pause: function () { self.setState({ playing: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+# Distribution plan
+
+How someone with a Lion Mac gets these apps, keeps them updated, and how we build releases.
+Status: **design**, owned by workstream WS-6 in `ROADMAP.md`.
+
+## Constraints
+
+- **Lion can't reach GitHub by itself.** Safari 6 and the system networking stop at TLS 1.0;
+  github.com and github.io require TLS 1.2+. Visitors need a modern browser on the Lion Mac
+  (Momiji, a maintained Firefox fork for 10.7+), or must download on another computer and copy the
+  file over USB or a network share. The website says this up front, with a Momiji link.
+- **Gatekeeper exists on 10.7.5** (default: Mac App Store and identified developers). Our apps are
+  unsigned, so the first launch is right-click → **Open** → Open. The site and the README in each
+  download show this with a screenshot. (No Developer ID: $99/yr, and Lion's codesign can't use
+  today's certificate chain anyway.)
+- **Apple's Python binary isn't ours to redistribute.** Each bundle currently contains a copy of
+  `Python.app/Contents/MacOS/Python` so the menu bar shows the app's name. Release builds leave it
+  out; the launcher copies it from the system on first run (see below).
+- **The runtime is big.** curl + OpenSSL 3 + friends is ~38 MB as assembled today, but half of that
+  is duplicated symlink targets and libraries curl doesn't load. The real dependency closure
+  should be ~12 MB.
+
+## What we ship
+
+One download per app: **`Kassett-0.3.dmg`**, a classic Lion disk image with the app, an
+alias to /Applications, a background picture telling you to drag one onto the other, and a
+"Read Me First" with the right-click → Open step. A `.zip` alongside it for people who prefer that.
+
+Inside the app bundle:
+
+```
+Kassett.app/Contents/
+  Info.plist
+  MacOS/Kassett          # launcher script (below)
+  Resources/main.py, lionkit/, AppIcon.icns
+  Resources/LionKit/           # the trimmed runtime: bin/curl, bin/dwebp, lib/*.dylib, CA bundle
+```
+
+**Self-contained runtime per app** (not a shared install): each app works on its own, nothing to
+install first, nothing to uninstall but the app. `lionkit.http` looks for the runtime in the
+bundle first, then `~/Library/LionKit` (dev builds).
+
+**First-run launcher**:
+
+```sh
+DIR="$(cd "$(dirname "$0")" && pwd)"
+SYS=/System/Library/Frameworks/Python.framework/Versions/2.7/Resources/Python.app/Contents/MacOS/Python
+[ -x "$DIR/python" ] || cp "$SYS" "$DIR/python" 2>/dev/null   # names the menu bar after the app
+[ -x "$DIR/python" ] && PY="$DIR/python" || PY="$SYS"          # read-only location: still works
+exec "$PY" "$DIR/../Resources/main.py" "$@" >>"$HOME/Library/Logs/<Exe>.log" 2>&1
+```
+
+## Building a release
+
+The Mac is the build machine (it has AppKit for icons, `sips`, `hdiutil`, `ditto`).
+
+```bash
+tools/package.sh apps/Kassett      # → dist/Kassett-0.3.dmg and .zip
+```
+
+1. Build the bundle on the Mac into a temp dir with `build_app.py --release` (no Python binary,
+   embedded trimmed runtime, version from `app.json`).
+2. Make the DMG with `hdiutil create -format UDZO` from a staging folder (app + /Applications
+   alias + background); lay out the Finder window with AppleScript in the GUI session.
+3. `ditto -c -k --keepParent` for the zip (keeps the bundle intact).
+4. Copy both back to `dist/` on Linux; print SHA-256 sums.
+5. Publish to **GitHub Releases** with `gh release create kassett-v0.3 dist/...`
+   (tag per app: `<app-id>-v<version>`). Only with the user's go-ahead.
+
+## Updates
+
+No Sparkle: Sparkle's networking would use Lion's TLS 1.0. Instead each app checks
+`https://xgzepto.github.io/lionkit/updates.json` through `lionkit.http` at most once a day:
+
+```json
+{"kassett": {"version": "0.3", "url": "https://github.com/.../Kassett-0.3.dmg",
+                    "notes": "Cassette deck, library browser, device switching"}}
+```
+
+If newer, a Lion-style sheet: "Kassett 0.3 is available — you have 0.2", release notes,
+**Download** (opens Momiji at the DMG) / **Not Now**. The site publishes `updates.json`.
+
+## The website
+
+Static HTML in `site/`, published by GitHub Pages through `.github/workflows/pages.yml`
+(no build step, no frameworks). It renders well in Momiji and modern browsers.
+
+## Spotify caveat
+
+Spotify developer-mode apps work only for **25 allowlisted accounts**, and Spotify grants extended
+quota only to organisations. The bundled Client ID therefore works for the user and people they add
+in the Spotify dashboard. Public builds need a "Use your own Spotify app…" path: a short guide on the
+site (create an app, add the redirect URI `http://127.0.0.1:8888/callback`) plus an Advanced
+button in the account sheet that sets the `clientID` default. **Open question for the user.**
+
+## Decided
+
+- The repo is public at https://github.com/XGZepto/lionkit under the MIT license, and the site is
+  served from it at https://xgzepto.github.io/lionkit/.
+
+## Still open
+
+- The Spotify public-build approach (above).

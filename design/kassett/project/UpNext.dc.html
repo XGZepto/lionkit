@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kassett — Up Next</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&amp;family=Kalam:wght@400;700&amp;family=Open+Sans:wght@400;600;700&amp;family=Permanent+Marker&amp;display=swap">
+<style>
+body{margin:0}
+@keyframes reelspin{to{transform:rotate(-360deg)}}
+.reel{transform-origin:50% 50%}
+.reel.on{animation:reelspin 2.4s linear infinite}
+</style>
+</helmet>
+<div style="position: relative; width: 860px; height: 580px; font-family: 'Lucida Grande', 'Lucida Sans Unicode', 'Open Sans', Verdana, sans-serif; color: #222;">
+<dc-import name="Main" hint-size="860px,580px"></dc-import>
+
+<div style="position: absolute; left: 520px; top: 160px; width: 300px; height: 340px; border-radius: 6px; background: linear-gradient(180deg, #ffffff, #f4f4f4); box-shadow: 0 0 0 1px rgba(0,0,0,0.28), 0 8px 22px rgba(0,0,0,0.5); display: flex; flex-direction: column;">
+<div style="position: absolute; left: 226px; bottom: -8px; width: 16px; height: 16px; transform: rotate(45deg); background: #f4f4f4; box-shadow: 1px 1px 0 rgba(0,0,0,0.28), 3px 3px 6px rgba(0,0,0,0.18);"></div>
+
+<div style="position: relative; display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 8px;">
+<span style="font-size: 13px; font-weight: 700;">Up Next</span>
+<span style="font-size: 11px; color: #6b6b6b;">from The Lion's Roar</span>
+</div>
+
+<div style="position: relative; padding: 0 14px; font: 700 10px/16px 'Lucida Grande', 'Open Sans', sans-serif; letter-spacing: 0.6px; color: #6b6b6b;">NOW PLAYING</div>
+<div style="position: relative; display: flex; align-items: center; gap: 9px; padding: 6px 14px 8px; border-bottom: 1px solid #e3e3e3;">
+<span style="width: 34px; height: 34px; flex-shrink: 0; background: linear-gradient(135deg, #f0c25a, #d27a33 55%, #8f3b1f); box-shadow: 0 0 0 1px rgba(0,0,0,0.2);"></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+<span style="font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The Lion's Roar</span>
+<span style="font-size: 11px; color: #6b6b6b;">First Aid Kit</span>
+</div>
+<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><path d="M1 4 H4 L8 1 V11 L4 8 H1 Z" fill="#2f6fd1"></path><path d="M10 3.5 Q12 6 10 8.5" fill="none" stroke="#2f6fd1" stroke-width="1.4"></path></svg>
+<span style="font-size: 11px; color: #6b6b6b; width: 30px; text-align: right;">4:05</span>
+</div>
+
+<div style="position: relative; padding: 8px 14px 2px; font: 700 10px/16px 'Lucida Grande', 'Open Sans', sans-serif; letter-spacing: 0.6px; color: #6b6b6b;">NEXT</div>
+<div style="position: relative; flex-grow: 1; display: flex; flex-direction: column;">
+<sc-for list="{{queue}}" as="t" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 9px; padding: 4px 14px; border-bottom: 1px solid #ececec; background: {{t.bg}}; color: {{t.fg}};">
+<span style="width: 26px; height: 26px; flex-shrink: 0; background: {{t.cover}}; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);"></span>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+<span style="font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.title}}</span>
+<span style="font-size: 10.5px; opacity: 0.75;">{{t.artist}}</span>
+</div>
+<span style="font-size: 11px; width: 30px; text-align: right; opacity: 0.8;">{{t.time}}</span>
+</div>
+</sc-for>
+</div>
+<div style="position: relative; padding: 7px 14px 9px; font-size: 10.5px; color: #6b6b6b; border-top: 1px solid #e3e3e3;">Right-click any song in the library and choose Add to Up Next.</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":860,"height":580}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var roar = 'linear-gradient(135deg, #f0c25a, #d27a33 55%, #8f3b1f)';
+    var rows = [
+      { title: 'Emmylou', artist: 'First Aid Kit', time: '4:16', cover: roar },
+      { title: 'In the Hearts of Men', artist: 'First Aid Kit', time: '4:08', cover: roar },
+      { title: 'Holocene', artist: 'Bon Iver', time: '5:36', cover: 'linear-gradient(135deg, #c9b48f, #6f5a3c)' },
+      { title: 'Midnight City', artist: 'M83', time: '4:03', cover: 'linear-gradient(135deg, #6a4e9b, #e07a5f)' },
+      { title: 'Video Games', artist: 'Lana Del Rey', time: '4:42', cover: 'linear-gradient(135deg, #4f6f8f, #1f2f43)' },
+      { title: 'Shake It Out', artist: 'Florence + the Machine', time: '4:37', cover: 'linear-gradient(135deg, #2c3e50, #8e44ad)' }
+    ];
+    return {
+      queue: rows.map(function (r, i) {
+        var sel = i === 2;
+        return {
+          title: r.title, artist: r.artist, time: r.time, cover: r.cover,
+          bg: sel ? 'linear-gradient(180deg, #5d93e0, #2f6ac6)' : 'transparent',
+          fg: sel ? '#ffffff' : '#222222'
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

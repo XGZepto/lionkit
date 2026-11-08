@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kassett — Devices menu</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&amp;family=Kalam:wght@400;700&amp;family=Open+Sans:wght@400;600;700&amp;family=Permanent+Marker&amp;display=swap">
+<style>
+body{margin:0}
+@keyframes reelspin{to{transform:rotate(-360deg)}}
+.reel{transform-origin:50% 50%}
+.reel.on{animation:reelspin 2.4s linear infinite}
+</style>
+</helmet>
+<div style="position: relative; width: 860px; height: 580px; font-family: 'Lucida Grande', 'Lucida Sans Unicode', 'Open Sans', Verdana, sans-serif; color: #1a1a1a;">
+<dc-import name="Main" hint-size="860px,580px"></dc-import>
+
+<div style="position: absolute; left: 600px; top: 336px; width: 224px; padding: 4px 0; border-radius: 5px; background: rgba(255,255,255,0.97); box-shadow: 0 0 0 1px rgba(0,0,0,0.22), 0 8px 20px rgba(0,0,0,0.45); display: flex; flex-direction: column; font-size: 14px;">
+<div style="height: 20px; display: flex; align-items: center; padding: 0 20px; color: #8a8a8a; font-size: 13px;">Play On</div>
+<sc-for list="{{devices}}" as="d" hint-placeholder-count="5">
+<div style="height: 22px; display: flex; align-items: center; gap: 7px; padding: 0 12px 0 6px; background: {{d.bg}}; color: {{d.fg}}; text-shadow: {{d.ts}};">
+<span style="width: 12px; font-size: 13px; text-align: center;">{{d.check}}</span>
+<sc-if value="{{d.isSpeaker}}" hint-placeholder-val="{{ false }}">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="4.5" y="1.5" width="9" height="15" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"></rect><circle cx="9" cy="11" r="2.6" fill="none" stroke="currentColor" stroke-width="1.3"></circle><circle cx="9" cy="5" r="1" fill="currentColor"></circle></svg>
+</sc-if>
+<sc-if value="{{d.isPhone}}" hint-placeholder-val="{{ false }}">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="5.5" y="1.5" width="7" height="15" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.5"></rect><circle cx="9" cy="13.7" r="0.9" fill="currentColor"></circle></svg>
+</sc-if>
+<sc-if value="{{d.isComputer}}" hint-placeholder-val="{{ false }}">
+<svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true"><rect x="3.5" y="3.5" width="11" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"></rect><rect x="1" y="13" width="16" height="2" rx="1" fill="currentColor"></rect></svg>
+</sc-if>
+<span style="flex-grow: 1;">{{d.label}}</span>
+<span style="font-size: 12px; opacity: 0.7;">{{d.note}}</span>
+</div>
+</sc-for>
+<div style="height: 1px; margin: 5px 0; background: #e2e2e2;"></div>
+<div style="height: 22px; display: flex; align-items: center; padding: 0 20px 0 25px; color: #8a8a8a;">Open Spotify on a device to add it</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":860,"height":580}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var list = [
+      { label: 'Living Room', kind: 'speaker', active: true },
+      { label: "Zepto's iPhone", kind: 'phone' },
+      { label: 'Kitchen', kind: 'speaker' },
+      { label: 'Desktop PC', kind: 'computer', hover: true },
+      { label: 'Bedroom TV', kind: 'speaker', note: 'busy', disabled: true }
+    ];
+    return {
+      devices: list.map(function (d) {
+        return {
+          label: d.label, note: d.note || '',
+          check: d.active ? '✓' : '',
+          isSpeaker: d.kind === 'speaker', isPhone: d.kind === 'phone', isComputer: d.kind === 'computer',
+          bg: d.hover ? 'linear-gradient(180deg, #6a9ae6, #2c64d0)' : 'transparent',
+          fg: d.hover ? '#ffffff' : (d.disabled ? '#9a9a9a' : '#1a1a1a'),
+          ts: d.hover ? '0 1px 0 rgba(0,0,0,0.25)' : 'none'
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

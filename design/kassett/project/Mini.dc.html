@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kassett — Mini player</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&amp;family=Kalam:wght@400;700&amp;family=Open+Sans:wght@400;600;700&amp;family=Permanent+Marker&amp;display=swap">
+<style>
+body{margin:0}
+@keyframes reelspin{to{transform:rotate(-360deg)}}
+.reel{transform-origin:50% 50%}
+.reel.on{animation:reelspin 2.4s linear infinite}
+</style>
+</helmet>
+<div style="width: 540px; height: 190px; box-sizing: border-box; padding: 40px; background-color: #3b3f46; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.09) 0px, rgba(0,0,0,0.09) 1px, transparent 1px, transparent 3px), radial-gradient(ellipse at 50% 35%, #4c5159, #2c3036); font-family: 'Lucida Grande', 'Lucida Sans Unicode', 'Open Sans', Verdana, sans-serif; color: #2b2b2b;">
+<div style="width: 460px; height: 110px; border-radius: 5px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 14px 30px rgba(0,0,0,0.55);">
+<div style="height: 16px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 0 6px; background: linear-gradient(180deg, #ececec, #d6d6d6); border-bottom: 1px solid #a3a3a3;">
+<span style="width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffc2b8 0%, #f2584c 45%, #b8281e 100%); box-shadow: 0 0 0 0.5px #8e2a22;"></span>
+<span style="width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffe9b3 0%, #f4bf3a 45%, #b9840f 100%); box-shadow: 0 0 0 0.5px #946a13;"></span>
+<span style="width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #d3f5b8 0%, #6cc84a 45%, #3a8a22 100%); box-shadow: 0 0 0 0.5px #3a7524;"></span>
+</div>
+<div style="flex-grow: 1; display: flex; align-items: center; gap: 12px; padding: 0 12px; background-color: #c8c8c8; background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 1px, rgba(0,0,0,0.04) 1px, rgba(0,0,0,0.04) 2px, transparent 2px, transparent 4px), linear-gradient(180deg, #e0e0e0, #b7b7b7);">
+<div style="position: relative; width: 96px; height: 62px; flex-shrink: 0; border-radius: 5px; background: linear-gradient(180deg, #414146, #222226); box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);">
+<div style="position: absolute; left: 6px; top: 5px; width: 84px; height: 40px; border-radius: 3px; background: linear-gradient(180deg, #f6efdb, #ece2c6); overflow: hidden;">
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: linear-gradient(180deg, #e2632e 0%, #e2632e 50%, #efa13a 50%, #efa13a 100%);"></div>
+<div style="position: absolute; left: 14px; top: 9px; width: 56px; height: 20px; border-radius: 4px; background: #241e1a; box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);">
+<svg class="{{spin}}" width="14" height="14" viewBox="0 0 36 36" aria-hidden="true" style="position: absolute; left: 6px; top: 3px;"><circle cx="18" cy="18" r="17" fill="#f3efe6"></circle><circle cx="18" cy="18" r="8.5" fill="#241e1a"></circle><rect x="16" y="8" width="4" height="6" fill="#f3efe6"></rect><rect x="16" y="8" width="4" height="6" fill="#f3efe6" transform="rotate(120 18 18)"></rect><rect x="16" y="8" width="4" height="6" fill="#f3efe6" transform="rotate(240 18 18)"></rect></svg>
+<svg class="{{spin}}" width="14" height="14" viewBox="0 0 36 36" aria-hidden="true" style="position: absolute; right: 6px; top: 3px;"><circle cx="18" cy="18" r="17" fill="#f3efe6"></circle><circle cx="18" cy="18" r="8.5" fill="#241e1a"></circle><rect x="16" y="8" width="4" height="6" fill="#f3efe6"></rect><rect x="16" y="8" width="4" height="6" fill="#f3efe6" transform="rotate(120 18 18)"></rect><rect x="16" y="8" width="4" height="6" fill="#f3efe6" transform="rotate(240 18 18)"></rect></svg>
+</div>
+</div>
+</div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<span style="font: 400 17px/1.1 'Permanent Marker', cursive; color: #26337f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The Lion's Roar</span>
+<span style="font: 400 13px/1.1 Kalam, cursive; color: #3a3a3a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">First Aid Kit</span>
+<div style="position: relative; height: 4px; margin-top: 5px; border-radius: 2px; background: #939393; box-shadow: inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.8);">
+<div style="position: absolute; left: 0; top: 0; bottom: 0; width: 42%; border-radius: 2px; background: #2f2f32;"></div>
+</div>
+</div>
+<div style="display: flex; gap: 0; border-radius: 4px; box-shadow: 0 0 0 1px #7b7b7b, 0 1px 0 rgba(255,255,255,0.5);">
+<button aria-label="Previous track" style="width: 32px; height: 24px; border: 0; padding: 0; border-radius: 4px 0 0 4px; border-right: 1px solid #8a8a8a; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center; color: #333;">
+<svg width="14" height="10" viewBox="0 0 22 14" aria-hidden="true"><rect x="1" y="1" width="2.5" height="12" fill="currentColor"></rect><path d="M12 1 L4 7 L12 13 Z" fill="currentColor"></path><path d="M21 1 L13 7 L21 13 Z" fill="currentColor"></path></svg>
+</button>
+<button aria-label="Play or pause" onClick="{{toggle}}" style="width: 36px; height: 24px; border: 0; padding: 0; border-right: 1px solid #8a8a8a; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center; color: #333;">
+<sc-if value="{{playing}}" hint-placeholder-val="{{ true }}">
+<svg width="10" height="12" viewBox="0 0 12 14" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" fill="currentColor"></rect><rect x="7.5" y="1" width="3.5" height="12" fill="currentColor"></rect></svg>
+</sc-if>
+<sc-if value="{{paused}}" hint-placeholder-val="{{ false }}">
+<svg width="10" height="12" viewBox="0 0 14 16" aria-hidden="true"><path d="M1 1 L13 8 L1 15 Z" fill="currentColor"></path></svg>
+</sc-if>
+</button>
+<button aria-label="Next track" style="width: 32px; height: 24px; border: 0; padding: 0; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center; color: #333;">
+<svg width="14" height="10" viewBox="0 0 22 14" aria-hidden="true"><path d="M1 1 L9 7 L1 13 Z" fill="currentColor"></path><path d="M10 1 L18 7 L10 13 Z" fill="currentColor"></path><rect x="18.5" y="1" width="2.5" height="12" fill="currentColor"></rect></svg>
+</button>
+</div>
+<a href="Main.dc.html" aria-label="Show the full deck" style="width: 28px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); box-shadow: 0 0 0 1px #7b7b7b, inset 0 1px 0 #ffffff;">
+<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 5 V1 H5 M7 11 H11 V7 M1 1 L5 5 M11 11 L7 7" fill="none" stroke="#333" stroke-width="1.4"></path></svg>
+</a>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":540,"height":190}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var st = this.state || {};
+    var playing = st.playing !== undefined ? st.playing : true;
+    var self = this;
+    return {
+      playing: playing,
+      paused: !playing,
+      spin: playing ? 'reel on' : 'reel',
+      toggle: function () { self.setState({ playing: !playing }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

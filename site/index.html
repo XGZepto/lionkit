@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LionKit: new apps for Mac OS X Lion</title>
+<meta name="description" content="Small native apps that let Mac OS X Lion post to a Ghost blog, control Spotify and join modern Wi-Fi. I build and test them on a 2010 MacBook Air.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&family=Kalam&family=Open+Sans:wght@400;700&family=Permanent+Marker&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root {
+  --ink: #333333;
+  --ink-soft: #5c5c5c;
+  --link: #0068c4;
+  --line: #d6d6d6;
+  --paper: #ffffff;
+  --mist: #f4f4f4;
+  --ui: 'Lucida Grande', 'Lucida Sans Unicode', 'Source Sans 3', 'Helvetica Neue', Arial, sans-serif;
+  --display: 'Source Sans 3', 'Myriad Pro', 'Helvetica Neue', Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper) radial-gradient(ellipse 120% 600px at 50% 0, #ececec, var(--paper) 70%) no-repeat;
+  color: var(--ink);
+  font: 15px/1.6 var(--ui);
+}
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; display: block; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+/* ---- 2011-style glossy navigation bar ---- */
+nav.bar { margin: 18px auto 0; max-width: 980px; padding: 0 16px; }
+nav.bar ul {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap;
+  border-radius: 5px; overflow: hidden;
+  background: linear-gradient(180deg, #8d8d8d 0%, #6a6a6a 48%, #4f4f4f 52%, #3e3e3e 100%);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+nav.bar li { flex: 1 1 auto; border-right: 1px solid rgba(0,0,0,0.35); box-shadow: 1px 0 0 rgba(255,255,255,0.12); }
+nav.bar li:last-child { border-right: 0; box-shadow: none; }
+nav.bar a {
+  display: flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 16px;
+  color: #ffffff; font: 13px var(--ui); text-shadow: 0 -1px 0 rgba(0,0,0,0.6); white-space: nowrap;
+}
+nav.bar a:hover { text-decoration: none; background: linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.25)); }
+nav.bar .home a { font-weight: bold; letter-spacing: 0.2px; }
+
+/* ---- hero ---- */
+.hero { text-align: center; padding: 46px 0 10px; }
+.hero h1 {
+  margin: 0; font: 600 clamp(36px, 6vw, 58px)/1.08 var(--display); letter-spacing: -0.8px; color: #2b2b2b;
+  text-shadow: 0 1px 0 #ffffff;
+}
+.hero p.lede { max-width: 640px; margin: 16px auto 0; font-size: 18px; line-height: 1.55; color: var(--ink-soft); }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 24px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 20px; border-radius: 17px;
+  font: bold 14px var(--ui); color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35);
+  background: linear-gradient(180deg, #6aaeef 0%, #3d8ee6 49%, #2a7cdc 51%, #3f8fe6 100%);
+  box-shadow: 0 0 0 1px #2463b0, inset 0 1px 0 rgba(255,255,255,0.5), 0 2px 3px rgba(0,0,0,0.2);
+}
+.btn:hover { text-decoration: none; filter: brightness(1.05); }
+.btn.plain {
+  color: #2b2b2b; text-shadow: 0 1px 0 #ffffff;
+  background: linear-gradient(180deg, #ffffff, #e4e4e4);
+  box-shadow: 0 0 0 1px #a8a8a8, inset 0 1px 0 #ffffff, 0 2px 3px rgba(0,0,0,0.12);
+}
+.fine { margin-top: 12px; font-size: 12px; color: var(--ink-soft); }
+
+/* ---- the MacBook Air ---- */
+.mba { max-width: 860px; margin: 40px auto 0; padding: 0 3%; }
+.mba-lid {
+  padding: 2.6% 2.6% 3.2%; border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, #e8e9eb, #c3c5c8);
+  box-shadow: inset 0 1px 0 #ffffff, inset 0 0 0 1px rgba(0,0,0,0.12);
+}
+.mba-screen { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: #000; box-shadow: 0 0 0 2px #1a1a1a; }
+.mba-screen .wall { width: 100%; height: 100%; object-fit: cover; }
+.mba-screen .win {
+  position: absolute; left: 10%; top: 6.2%; width: 80%; height: auto; border-radius: 4px 4px 0 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 12px 32px rgba(0,0,0,0.55);
+}
+.mba-base {
+  position: relative; height: 15px; margin: 0 -3%;
+  background: linear-gradient(180deg, #f2f3f4 0%, #c9cbce 55%, #9c9ea2 100%);
+  clip-path: polygon(0 0, 100% 0, 98.5% 100%, 1.5% 100%);
+}
+.mba-base::after {
+  content: ""; position: absolute; left: 50%; top: 0; width: 13%; height: 6px; transform: translateX(-50%);
+  border-radius: 0 0 8px 8px; background: linear-gradient(180deg, #b7b9bc, #d9dadc);
+}
+.shadow { height: 40px; margin: 0 6%; background: radial-gradient(ellipse 50% 60% at 50% 0, rgba(0,0,0,0.22), rgba(0,0,0,0)); }
+
+/* ---- sections ---- */
+section { padding: 56px 0 8px; }
+h2 { margin: 0 0 6px; font: 600 clamp(28px, 4vw, 36px)/1.15 var(--display); letter-spacing: -0.4px; color: #2b2b2b; text-shadow: 0 1px 0 #ffffff; }
+.sub { margin: 0 0 26px; color: var(--ink-soft); font-size: 16px; max-width: 680px; }
+
+.app {
+  display: flex; flex-wrap: wrap; gap: 28px; align-items: center;
+  padding: 28px; margin-bottom: 22px; border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #f6f6f6);
+  box-shadow: 0 0 0 1px var(--line), inset 0 1px 0 #ffffff, 0 2px 4px rgba(0,0,0,0.06);
+}
+.app .icon { width: 128px; height: 128px; flex: 0 0 auto; }
+.app .text { flex: 1 1 360px; min-width: 0; }
+.app h3 { margin: 0; font: 600 26px/1.2 var(--display); color: #222; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.app p { margin: 8px 0 0; color: var(--ink-soft); }
+.app ul { margin: 10px 0 0; padding-left: 18px; color: var(--ink-soft); }
+.app .shot { flex: 1 1 100%; }
+.pill {
+  display: inline-block; padding: 2px 9px; border-radius: 10px; font: bold 10px/14px var(--ui); letter-spacing: 0.6px;
+  color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.3); vertical-align: middle;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 0 0 1px rgba(0,0,0,0.15);
+}
+.pill.green { background: linear-gradient(180deg, #74c463, #3c9a2e); }
+.pill.amber { background: linear-gradient(180deg, #f2b44c, #d68512); }
+.pill.gray { background: linear-gradient(180deg, #a5a5a5, #7a7a7a); }
+
+.soon { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.soon div {
+  padding: 18px 20px; border-radius: 8px; background: var(--mist);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.08), 0 1px 0 #ffffff;
+}
+.soon b { display: block; font: 600 18px var(--display); color: #2b2b2b; margin-bottom: 4px; }
+.soon span { font-size: 13px; color: var(--ink-soft); }
+
+/* the cassette deck, drawn in CSS and scaled to fit */
+.deck-wrap { position: relative; width: 100%; max-width: 780px; aspect-ratio: 780 / 500; margin: 6px auto 0; }
+.deck { position: absolute; left: 0; top: 0; width: 780px; height: 500px; transform-origin: 0 0; transform: scale(var(--deck-scale, 1)); }
+.deck, .deck * { box-sizing: content-box; }
+.deck button { font: inherit; }
+@keyframes reelspin { to { transform: rotate(-360deg); } }
+.reel { transform-origin: 50% 50%; }
+.reel.on { animation: reelspin 2.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .reel.on { animation: none; } }
+.caption { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; counter-reset: step; }
+.step {
+  position: relative; padding: 22px 22px 22px 70px; border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #f6f6f6); box-shadow: 0 0 0 1px var(--line), inset 0 1px 0 #ffffff;
+}
+.step::before {
+  counter-increment: step; content: counter(step); position: absolute; left: 20px; top: 18px;
+  font: 700 38px/1 var(--display); color: #c6c6c6; text-shadow: 0 1px 0 #ffffff;
+}
+.step b { display: block; font: 600 18px var(--display); color: #222; margin-bottom: 4px; }
+.step p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+.hood { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 24px; }
+.hood b { display: block; font: 600 17px var(--display); color: #222; margin-bottom: 4px; }
+.hood p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+
+.story {
+  margin-top: 8px; padding: 30px; border-radius: 10px; color: #f3efe6;
+  background: linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.35)), #6b4a2b;
+  background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px), linear-gradient(160deg, #7c5634, #4a3019);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.25);
+}
+.story h2 { color: #fff8ec; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+.story p { max-width: 700px; color: #efe5d3; }
+.story a { color: #ffd68a; font-weight: bold; }
+
+footer { margin-top: 64px; padding: 26px 0 40px; background: var(--mist); border-top: 1px solid #e0e0e0; font-size: 12px; color: var(--ink-soft); }
+footer p { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<nav class="bar" aria-label="Site">
+<ul>
+<li class="home"><a href="#top"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="10" r="4.2" fill="#ffffff"></circle><circle cx="3" cy="5.2" r="1.9" fill="#ffffff"></circle><circle cx="6.3" cy="2.6" r="1.9" fill="#ffffff"></circle><circle cx="9.7" cy="2.6" r="1.9" fill="#ffffff"></circle><circle cx="13" cy="5.2" r="1.9" fill="#ffffff"></circle></svg>LionKit</a></li>
+<li><a href="#apps">Apps</a></li>
+<li><a href="#start">Get Started</a></li>
+<li><a href="#hood">How It Works</a></li>
+<li><a href="#story">The Story</a></li>
+<li><a href="https://github.com/XGZepto/lionkit">GitHub</a></li>
+</ul>
+</nav>
+
+<main id="top">
+<div class="wrap hero">
+<h1>New apps for Mac OS X Lion</h1>
+<p class="lede">I'm writing small Mac apps so my mom's 2010 MacBook Air can do everyday things again, like posting to my blog, playing Spotify around the house and staying on our Wi-Fi. They run on Lion and use the same secure connections modern browsers do. I also want them to feel like they came out in 2011, so every window is drawn in Lion's style. 🦁</p>
+<div class="actions">
+<a class="btn" href="#start">Get Started</a>
+<a class="btn plain" href="https://zepto.page/bringing-lion-back/">Read the story ›</a>
+</div>
+<p class="fine">The apps need Mac OS X Lion 10.7.5 on an Intel Mac. I'll post downloads here once the first beta is ready.</p>
+</div>
+
+<div class="mba" role="img" aria-label="A MacBook Air running Mac OS X Lion, with Planchette open on the desktop">
+<div class="mba-lid">
+<div class="mba-screen">
+<img class="wall" src="img/lion-desktop.jpg" alt="">
+<img class="win" src="img/planchette.png" alt="">
+</div>
+</div>
+<div class="mba-base"></div>
+<div class="shadow"></div>
+</div>
+
+<section id="apps">
+<div class="wrap">
+<h2>The apps</h2>
+<p class="sub">Every app here is a regular Cocoa app with proper menus, keyboard shortcuts and Keychain support.</p>
+
+<article class="app">
+<img class="icon" src="img/planchette-icon.png" alt="Planchette icon: a wooden planchette resting on a leather notebook">
+<div class="text">
+<h3>Planchette <span class="pill amber">BETA 0.3</span></h3>
+<p>Planchette is the app I use to write for my blog on the Air, and it works with any blog that runs on Ghost. I write in Markdown on the left, and the preview on the right scrolls along with me. The sidebar sorts my posts into drafts, scheduled and published, and edits sync in both directions, so a change I make in Ghost's web editor shows up in the app too. If a post was changed on the web after I opened it, Planchette asks me before it overwrites anything.</p>
+<ul>
+<li>The preview shows images as well, including WebP files that Lion can't open by itself.</li>
+<li>An inspector panel holds the slug, excerpt, tags and feature image.</li>
+<li>I can save a draft, publish, update or unpublish a post without opening a browser.</li>
+</ul>
+<p>It's named after the pointer on a spirit board, which people used to fit with a pencil for "spirit writing". 👻</p>
+</div>
+</article>
+
+<article class="app">
+<img class="icon" src="img/kassett-icon.png" alt="Kassett icon: a green play button">
+<div class="text">
+<h3>Kassett <span class="pill amber">BETA 0.2</span></h3>
+<p>Kassett controls Spotify on your phone, speakers or TV from the Mac. A menu like the AirPlay menu in iTunes lets you move the music to another device. The next version turns the window into the cassette deck below and adds a library browser for playlists, albums, artists and search.</p>
+<ul>
+<li>You can play, pause, skip and change the volume on any Spotify Connect device.</li>
+<li>Playback control needs a Spotify Premium account.</li>
+</ul>
+<p>The name is Swedish for cassette, because Spotify started in Stockholm. 📼</p>
+</div>
+<div class="shot">
+<div class="deck-wrap" id="deckWrap">
+<div class="deck" id="deck">
+<div style="width: 780px; height: 500px; border-radius: 5px 5px 4px 4px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 22px 46px rgba(0,0,0,0.55);">
+
+<div style="height: 22px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #ececec, #d4d4d4); border-bottom: 1px solid #9c9c9c; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);">
+<div style="position: absolute; left: 8px; top: 5px; display: flex; gap: 8px;">
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffc2b8 0%, #f2584c 45%, #b8281e 100%); box-shadow: 0 0 0 0.5px #8e2a22, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffe9b3 0%, #f4bf3a 45%, #b9840f 100%); box-shadow: 0 0 0 0.5px #946a13, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #d3f5b8 0%, #6cc84a 45%, #3a8a22 100%); box-shadow: 0 0 0 0.5px #3a7524, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+</div>
+<span style="font-size: 13px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.7);">Kassett</span>
+</div>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 18px 22px 16px; background-color: #c8c8c8; background-image: repeating-linear-gradient(180deg, rgba(255,255,255,0.12) 0px, rgba(255,255,255,0.12) 1px, rgba(0,0,0,0.04) 1px, rgba(0,0,0,0.04) 2px, transparent 2px, transparent 4px), repeating-linear-gradient(180deg, rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 3px, rgba(255,255,255,0.05) 3px, rgba(255,255,255,0.05) 7px), linear-gradient(180deg, #e0e0e0, #b7b7b7); box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);">
+
+<div style="display: flex; gap: 22px; height: 284px;">
+
+<div style="position: relative; width: 452px; height: 284px; flex-shrink: 0; border-radius: 10px; background: linear-gradient(180deg, #17181b, #26282c); box-shadow: inset 0 3px 10px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center;">
+
+<div style="position: relative; width: 400px; height: 252px; border-radius: 12px; background: linear-gradient(180deg, #414146, #222226); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -2px 4px rgba(0,0,0,0.35), 0 3px 10px rgba(0,0,0,0.7);">
+<span style="position: absolute; left: 9px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+<span style="position: absolute; right: 9px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+<span style="position: absolute; left: 9px; bottom: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+<span style="position: absolute; right: 9px; bottom: 9px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #f4f4f4, #8d8d8d); box-shadow: 0 0 0 1px rgba(0,0,0,0.5);"></span>
+
+<div style="position: absolute; left: 22px; top: 16px; width: 356px; height: 162px; border-radius: 5px; overflow: hidden; background: linear-gradient(180deg, #f6efdb, #ece2c6); box-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+<div style="position: absolute; left: 0; right: 0; top: 30px; height: 1px; background: rgba(70,110,170,0.28);"></div>
+<div style="position: absolute; left: 0; right: 0; top: 54px; height: 1px; background: rgba(70,110,170,0.28);"></div>
+<div style="position: absolute; left: 12px; top: 8px; width: 26px; height: 26px; border: 2px solid #2d2d2d; border-radius: 4px; display: flex; align-items: center; justify-content: center; font: 700 20px/1 Arimo, Helvetica, Arial, sans-serif; color: #2d2d2d;">A</div>
+<div style="position: absolute; left: 50px; right: 14px; top: 3px; font: 400 22px/30px 'Permanent Marker', cursive; color: #26337f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The Lion's Roar</div>
+<div style="position: absolute; left: 52px; right: 14px; top: 33px; font: 400 15px/20px Kalam, cursive; color: #26337f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">First Aid Kit — The Lion's Roar (2012)</div>
+
+<div style="position: absolute; left: 68px; top: 64px; width: 220px; height: 62px; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #3a322d, #1e1916); box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 0 2px #d9cfb4;">
+<div style="position: absolute; border-radius: 50%; left: 14.5px; top: -9.5px; width: 81px; height: 81px; background: repeating-radial-gradient(circle, #5d3d25 0px, #5d3d25 1px, #4a2f1b 1px, #4a2f1b 2px);"></div>
+<div style="position: absolute; border-radius: 50%; left: 130.5px; top: -3.5px; width: 69px; height: 69px; background: repeating-radial-gradient(circle, #5d3d25 0px, #5d3d25 1px, #4a2f1b 1px, #4a2f1b 2px);"></div>
+<svg class="reel on" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" style="position: absolute; left: 37px; top: 13px;"><circle cx="18" cy="18" r="17" fill="#f3efe6" stroke="#b9b1a0" stroke-width="1"></circle><circle cx="18" cy="18" r="8.5" fill="#241e1a"></circle><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(60 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(120 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(180 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(240 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(300 18 18)"></rect><circle cx="18" cy="4.5" r="1.6" fill="#cfc6b3"></circle><circle cx="18" cy="31.5" r="1.6" fill="#cfc6b3"></circle></svg>
+<svg class="reel on" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" style="position: absolute; left: 147px; top: 13px;"><circle cx="18" cy="18" r="17" fill="#f3efe6" stroke="#b9b1a0" stroke-width="1"></circle><circle cx="18" cy="18" r="8.5" fill="#241e1a"></circle><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(60 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(120 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(180 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(240 18 18)"></rect><rect x="17" y="9.5" width="2" height="4" fill="#f3efe6" transform="rotate(300 18 18)"></rect><circle cx="18" cy="4.5" r="1.6" fill="#cfc6b3"></circle><circle cx="18" cy="31.5" r="1.6" fill="#cfc6b3"></circle></svg>
+<div style="position: absolute; left: 0; right: 0; top: 0; height: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0));"></div>
+</div>
+
+<div style="position: absolute; left: 300px; top: 70px; font: 700 10px/1 Arimo, Helvetica, Arial, sans-serif; color: #6b5f48; letter-spacing: 1px;">C60</div>
+<div style="position: absolute; left: 14px; top: 74px; font: 700 10px/1 Arimo, Helvetica, Arial, sans-serif; color: #6b5f48; letter-spacing: 1px;">NR ☐</div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 30px; background: linear-gradient(180deg, #e2632e 0%, #e2632e 33%, #efa13a 33%, #efa13a 66%, #e8d39e 66%, #e8d39e 100%);"></div>
+</div>
+
+<div style="position: absolute; left: 72px; bottom: 0; width: 256px; height: 56px; clip-path: polygon(9% 0, 91% 0, 100% 100%, 0 100%); background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0.3)); display: flex; align-items: center; justify-content: center; gap: 30px;">
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+<span style="width: 14px; height: 10px; border-radius: 2px; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+<span style="width: 14px; height: 10px; border-radius: 2px; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #0c0c0d; box-shadow: inset 0 1px 2px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.15);"></span>
+</div>
+</div>
+
+<div style="position: absolute; inset: 0; border-radius: 10px; background: linear-gradient(155deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.03) 38%, rgba(255,255,255,0) 60%); pointer-events: none;"></div>
+</div>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 2px;">
+<div style="position: relative; width: 178px; height: 178px; background: linear-gradient(135deg, #f0c25a 0%, #d27a33 55%, #8f3b1f 100%); box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 3px 8px rgba(0,0,0,0.45); overflow: hidden;">
+<div style="position: absolute; left: 14px; right: 14px; bottom: 16px; font: 700 21px/1.05 Arimo, Helvetica, Arial, sans-serif; color: #fff8ec; text-shadow: 0 1px 2px rgba(0,0,0,0.35); letter-spacing: -0.3px;">THE LION'S ROAR</div>
+<div style="position: absolute; left: 14px; top: 14px; font: 400 11px/1 Arimo, Helvetica, Arial, sans-serif; color: rgba(255,248,236,0.9); letter-spacing: 2px;">FIRST AID KIT</div>
+<div style="position: absolute; inset: 0; background: linear-gradient(160deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 45%);"></div>
+</div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+<span style="font: 700 9px/1 'Open Sans', sans-serif; letter-spacing: 1.5px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.8);">TAPE COUNTER</span>
+<div style="display: flex; align-items: center; gap: 2px; padding: 5px 7px; border-radius: 5px; background: #111214; box-shadow: inset 0 2px 4px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.85);">
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">0</span>
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">1</span>
+<span style="width: 8px; text-align: center; font: 700 20px/1 Arimo, Helvetica, Arial, sans-serif; color: #c9c4b8;">:</span>
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">4</span>
+<span style="width: 20px; height: 30px; display: flex; align-items: center; justify-content: center; font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: #f5f2ea; background: linear-gradient(180deg, #3a3a3d 0%, #151517 30%, #151517 70%, #3a3a3d 100%); border-radius: 2px;">3</span>
+</div>
+<span style="font-size: 11px; color: #3f3f3f; text-shadow: 0 1px 0 rgba(255,255,255,0.75);">−2:22 remaining</span>
+</div>
+</div>
+</div>
+
+<div style="display: flex; align-items: center; gap: 10px; width: 452px;">
+<span style="font-size: 10px; color: #3f3f3f; text-shadow: 0 1px 0 rgba(255,255,255,0.75); width: 30px;">1:43</span>
+<div style="position: relative; flex-grow: 1; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #8b8b8b, #a9a9a9); box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.85);">
+<div style="position: absolute; left: 0; top: 0; bottom: 0; width: 42%; border-radius: 3px; background: linear-gradient(180deg, #4b4b4f, #2b2b2e);"></div>
+<span style="position: absolute; top: -5px; left: calc(42% - 8px); width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #ffffff, #c4c4c4 70%, #a3a3a3); box-shadow: 0 1px 2px rgba(0,0,0,0.55), inset 0 -1px 0 rgba(0,0,0,0.15);"></span>
+</div>
+<span style="font-size: 10px; color: #3f3f3f; text-shadow: 0 1px 0 rgba(255,255,255,0.75); width: 30px; text-align: right;">4:05</span>
+</div>
+
+<div style="display: flex; align-items: flex-end; gap: 18px;">
+<div style="display: flex; gap: 2px; padding: 0 4px 4px; border-radius: 0 0 7px 7px; background: #1c1d20; box-shadow: inset 0 2px 3px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.85);">
+<button aria-label="Previous track" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><rect x="1" y="1" width="2.5" height="12" fill="currentColor"></rect><path d="M12 1 L4 7 L12 13 Z" fill="currentColor"></path><path d="M21 1 L13 7 L21 13 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">PREV</span>
+</button>
+<button aria-label="Rewind 15 seconds" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><path d="M10 1 L1 7 L10 13 Z" fill="currentColor"></path><path d="M19 1 L10 7 L19 13 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">REW</span>
+</button>
+<button aria-label="Play" data-key="play" style="width: 66px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #2f2f2f; transform: translateY(3px); background: linear-gradient(180deg, #c9c9c9, #b4b4b4); box-shadow: inset 0 2px 4px rgba(0,0,0,0.35);">
+<svg width="14" height="16" viewBox="0 0 14 16" aria-hidden="true"><path d="M1 1 L13 8 L1 15 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">PLAY</span>
+</button>
+<button aria-label="Pause" data-key="pause" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; transform: none; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" fill="currentColor"></rect><rect x="7.5" y="1" width="3.5" height="12" fill="currentColor"></rect></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">PAUSE</span>
+</button>
+<button aria-label="Fast forward 15 seconds" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><path d="M1 1 L10 7 L1 13 Z" fill="currentColor"></path><path d="M10 1 L19 7 L10 13 Z" fill="currentColor"></path></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">FF</span>
+</button>
+<button aria-label="Next track" style="width: 56px; height: 62px; border: 0; border-radius: 0 0 6px 6px; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5);">
+<svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M1 1 L9 7 L1 13 Z" fill="currentColor"></path><path d="M10 1 L18 7 L10 13 Z" fill="currentColor"></path><rect x="18.5" y="1" width="2.5" height="12" fill="currentColor"></rect></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">NEXT</span>
+</button>
+</div>
+
+<span aria-hidden="true" style="width: 62px; height: 62px; margin-bottom: 4px; border-radius: 6px; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #3a3a3a; background: linear-gradient(180deg, #fbfbfb, #cdcdcd); box-shadow: inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.35), 0 2px 3px rgba(0,0,0,0.35);">
+<svg width="16" height="15" viewBox="0 0 16 15" aria-hidden="true"><path d="M8 1 L15 9 L1 9 Z" fill="currentColor"></path><rect x="1" y="11" width="14" height="3" fill="currentColor"></rect></svg>
+<span style="font: 700 8px/1 'Open Sans', sans-serif; letter-spacing: 1px;">LIBRARY</span>
+</span>
+
+<div style="flex-grow: 1;"></div>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px; margin-right: 34px;">
+<div style="position: relative; width: 74px; height: 74px; border-radius: 50%; background: linear-gradient(180deg, #8c8c8c, #e8e8e8); box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.6);">
+<div style="position: absolute; left: 4px; top: 4px; width: 66px; height: 66px; border-radius: 50%; background: conic-gradient(#efefef, #b2b2b2 12%, #f7f7f7 25%, #a8a8a8 38%, #ededed 50%, #b0b0b0 62%, #f5f5f5 75%, #a9a9a9 88%, #efefef); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);"></div>
+<div style="position: absolute; left: 4px; top: 4px; width: 66px; height: 66px; transform: rotate(37.8deg);">
+<span style="position: absolute; left: 30px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: #2f2f2f; box-shadow: 0 1px 0 rgba(255,255,255,0.8);"></span>
+</div>
+</div>
+<span style="font: 700 9px/1 'Open Sans', sans-serif; letter-spacing: 1.5px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.8);">VOLUME 64</span>
+</div>
+</div>
+</div>
+
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: linear-gradient(180deg, #d2d2d2, #a9a9a9); border-top: 1px solid #7e7e7e; box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);">
+<svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true"><rect x="4.5" y="1.5" width="9" height="15" rx="1.6" fill="none" stroke="#3d3d3d" stroke-width="1.5"></rect><circle cx="9" cy="11" r="2.6" fill="none" stroke="#3d3d3d" stroke-width="1.3"></circle><circle cx="9" cy="5" r="1" fill="#3d3d3d"></circle></svg>
+<span style="font-size: 11px; color: #2f2f2f; text-shadow: 0 1px 0 rgba(255,255,255,0.55);">Playing on Living Room · Spotify Premium</span>
+<div style="flex-grow: 1;"></div>
+<span aria-hidden="true" style="width: 32px; height: 21px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); box-shadow: 0 0 0 1px #7b7b7b, inset 0 1px 0 #ffffff, 0 1px 0 rgba(255,255,255,0.4);">
+<svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><rect x="0" y="1" width="2" height="2" fill="#3d3d3d"></rect><rect x="4" y="1" width="10" height="2" fill="#3d3d3d"></rect><rect x="0" y="5" width="2" height="2" fill="#3d3d3d"></rect><rect x="4" y="5" width="10" height="2" fill="#3d3d3d"></rect><rect x="0" y="9" width="2" height="2" fill="#3d3d3d"></rect><rect x="4" y="9" width="10" height="2" fill="#3d3d3d"></rect></svg>
+</span>
+<span aria-hidden="true" style="width: 32px; height: 21px; border-radius: 4px; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); box-shadow: 0 0 0 1px #7b7b7b, inset 0 1px 0 #ffffff, 0 1px 0 rgba(255,255,255,0.4);">
+<svg width="16" height="15" viewBox="0 0 18 17" aria-hidden="true"><path d="M5.5 12.5 H2.5 V1.5 H15.5 V12.5 H12.5" fill="none" stroke="#3d3d3d" stroke-width="1.6" stroke-linejoin="round"></path><path d="M4.5 16.5 H13.5 L9 10.5 Z" fill="#3d3d3d"></path></svg>
+</span>
+</div>
+
+</div>
+</div>
+</div>
+<p class="caption">This is the cassette deck planned for Kassett 0.3. Press PLAY or PAUSE to start and stop the reels.</p>
+</div>
+</article>
+
+<article class="app">
+<svg class="icon" viewBox="0 0 128 128" role="img" aria-label="Wi-Fi Fix icon: Wi-Fi waves on a glass disc"><defs><radialGradient id="wg" cx="50%" cy="35%" r="70%"><stop offset="0" stop-color="#8fc3f4"></stop><stop offset="1" stop-color="#1f5fb8"></stop></radialGradient></defs><circle cx="64" cy="64" r="58" fill="url(#wg)" stroke="#184d96" stroke-width="2"></circle><path d="M26 58 A54 54 0 0 1 102 58" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round"></path><path d="M38 72 A36 36 0 0 1 90 72" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round"></path><path d="M51 86 A18 18 0 0 1 77 86" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round"></path><circle cx="64" cy="98" r="6" fill="#ffffff"></circle><ellipse cx="64" cy="34" rx="40" ry="20" fill="#ffffff" opacity="0.22"></ellipse></svg>
+<div class="text">
+<h3>Wi-Fi Fix <span class="pill green">WORKS</span></h3>
+<p>Most home routers now offer WPA2 and WPA3 on the same network. Lion doesn't recognize the WPA3 part, so it lists the network as "WPA2 Enterprise" and won't join it. Wi-Fi Fix removes the part Lion can't read and joins with plain WPA2, which the router still accepts.</p>
+<ul>
+<li>It checks every 30 seconds and rejoins if the connection drops.</li>
+<li>Right now it's a script, and I'm turning it into a small menu bar app.</li>
+</ul>
+</div>
+</article>
+
+<h2 style="margin-top: 40px;">What I'm working on next</h2>
+<p class="sub">These are the next apps on my list.</p>
+<div class="soon">
+<div><b>Murmur</b><span>A Mastodon and Bluesky client in the style of Tweetie, with both accounts in one column.</span></div>
+<div><b>Weather widget</b><span>A Dashboard widget that looks like Apple's weather widget and gets its forecast over a modern secure connection.</span></div>
+<div><b>A reading app</b><span>An RSS reader inspired by Reeder.</span></div>
+</div>
+</div>
+</section>
+
+<section id="start">
+<div class="wrap">
+<h2>Getting started</h2>
+<p class="sub">Setting things up takes about five minutes.</p>
+<div class="steps">
+<div class="step"><b>Get a modern browser</b><p>Safari on Lion only supports TLS 1.0, and almost every website needs something newer, including this one. <a href="https://github.com/aobaharuki2005/momiji-web-browser">Momiji</a> is a Firefox-based browser that still supports Lion, so install it first.</p></div>
+<div class="step"><b>Download an app</b><p>Each app comes as a single download that already contains the networking code it needs. Drag it into your Applications folder.</p></div>
+<div class="step"><b>Open it with a right-click the first time</b><p>The apps aren't signed by Apple, so Gatekeeper stops them the first time you open them. Control-click the app, choose Open, and then click Open again. After that it opens normally.</p></div>
+</div>
+</div>
+</section>
+
+<section id="hood">
+<div class="wrap">
+<h2>How it works</h2>
+<p class="sub">Lion comes with Python 2.7 and PyObjC, which is enough to build full Cocoa apps without Xcode. What it can't do is talk to most of today's web, because its networking stops at TLS 1.0. LionKit fixes that by bundling curl 8 and OpenSSL 3 from MacPorts' builds for Lion, and each package is checked against MacPorts' signing key before it's installed.</p>
+<p class="sub">Passwords and API keys go into your login keychain and never into plain files. I test every screen on the same Late 2010 MacBook Air with 2 GB of RAM that started this project.</p>
+</div>
+</section>
+
+<section id="story">
+<div class="wrap">
+<div class="story">
+<h2>Why I started this</h2>
+<p>It started with my mom's 2010 MacBook Air. Apple supports it up to High Sierra, but I went back to Lion because I like it more, especially the animations. After that I started fixing the things the modern internet broke, one at a time.</p>
+<p><a href="https://zepto.page/bringing-lion-back/">Read the whole story on my blog ›</a></p>
+</div>
+</div>
+</section>
+</main>
+
+<footer>
+<div class="wrap">
+<p>LionKit is a hobby project. I build it on a Linux PC and test it on a 2010 MacBook Air. The source code is on <a href="https://github.com/XGZepto/lionkit">GitHub</a> under the MIT license.</p>
+<p>LionKit isn't affiliated with Apple, Spotify or the Ghost Foundation. Mac, Mac OS X and Lion are trademarks of Apple Inc., Spotify is a trademark of Spotify AB, and Ghost is a trademark of the Ghost Foundation.</p>
+</div>
+</footer>
+
+<script>
+(function () {
+  var wrap = document.getElementById('deckWrap'), deck = document.getElementById('deck');
+  function fit() { deck.style.setProperty('--deck-scale', Math.min(1, wrap.clientWidth / 780)); }
+  fit();
+  if (window.ResizeObserver) { new ResizeObserver(fit).observe(wrap); } else { window.addEventListener('resize', fit); }
+  var play = deck.querySelector('[data-key="play"]'), pause = deck.querySelector('[data-key="pause"]');
+  var up = { t: 'none', bg: 'linear-gradient(180deg, #fbfbfb, #cdcdcd)', sh: 'inset 0 1px 0 #ffffff, inset 0 -3px 0 rgba(0,0,0,0.16), 0 1px 0 rgba(0,0,0,0.5)' };
+  var down = { t: 'translateY(3px)', bg: 'linear-gradient(180deg, #c9c9c9, #b4b4b4)', sh: 'inset 0 2px 4px rgba(0,0,0,0.35)' };
+  function set(key, s) { key.style.transform = s.t; key.style.background = s.bg; key.style.boxShadow = s.sh; }
+  function playing(on) {
+    deck.querySelectorAll('.reel').forEach(function (r) { r.classList.toggle('on', on); });
+    set(play, on ? down : up); set(pause, on ? up : down);
+  }
+  if (play && pause) {
+    play.addEventListener('click', function () { playing(true); });
+    pause.addEventListener('click', function () { playing(false); });
+  }
+})();
+</script>
+</body>
+</html>

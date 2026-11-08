@@ -1,0 +1,10 @@
+*.pyc
+__pycache__/
+# MacPorts packages and the assembled LionKit binaries (fetched by tools/fetch_macports.py)
+tools/pkgs/
+tools/stage/
+LionKit/
+LionKit.tgz
+
+# agent worktrees created by Claude sessions
+.claude/

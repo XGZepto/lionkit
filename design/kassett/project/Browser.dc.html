@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kassett — Library</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&amp;family=Kalam:wght@400;700&amp;family=Open+Sans:wght@400;600;700&amp;family=Permanent+Marker&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1140px; height: 740px; box-sizing: border-box; padding: 40px; background-color: #3b3f46; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.09) 0px, rgba(0,0,0,0.09) 1px, transparent 1px, transparent 3px), radial-gradient(ellipse at 50% 35%, #4c5159, #2c3036); font-family: 'Lucida Grande', 'Lucida Sans Unicode', 'Open Sans', Verdana, sans-serif; color: #1d1d1d;">
+<div style="width: 1060px; height: 660px; border-radius: 5px 5px 4px 4px; overflow: hidden; display: flex; flex-direction: column; background: #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 22px 46px rgba(0,0,0,0.55);">
+
+<div style="height: 64px; flex-shrink: 0; position: relative; display: flex; flex-direction: column; background: linear-gradient(180deg, #ededed, #c6c6c6); border-bottom: 1px solid #8a8a8a; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);">
+<div style="height: 22px; position: relative; display: flex; align-items: center; justify-content: center;">
+<div style="position: absolute; left: 8px; top: 5px; display: flex; gap: 8px;">
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffc2b8 0%, #f2584c 45%, #b8281e 100%); box-shadow: 0 0 0 0.5px #8e2a22, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #ffe9b3 0%, #f4bf3a 45%, #b9840f 100%); box-shadow: 0 0 0 0.5px #946a13, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+<span style="width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #d3f5b8 0%, #6cc84a 45%, #3a8a22 100%); box-shadow: 0 0 0 0.5px #3a7524, inset 0 1px 1px rgba(255,255,255,0.6);"></span>
+</div>
+<span style="font-size: 13px; color: #4a4a4a; text-shadow: 0 1px 0 rgba(255,255,255,0.7);">Library</span>
+</div>
+<div style="flex-grow: 1; display: flex; align-items: center; gap: 10px; padding: 0 10px 4px;">
+<div style="display: flex; border-radius: 4px; box-shadow: 0 0 0 1px #7b7b7b, 0 1px 0 rgba(255,255,255,0.5);">
+<button aria-label="Back" onClick="{{goAlbums}}" style="width: 28px; height: 23px; border: 0; padding: 0; border-radius: 4px 0 0 4px; border-right: 1px solid #8a8a8a; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center;">
+<svg width="8" height="11" viewBox="0 0 8 11" aria-hidden="true"><path d="M7 1 L2 5.5 L7 10" fill="none" stroke="#333" stroke-width="1.8"></path></svg>
+</button>
+<button aria-label="Forward" style="width: 28px; height: 23px; border: 0; padding: 0; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center;">
+<svg width="8" height="11" viewBox="0 0 8 11" aria-hidden="true"><path d="M1 1 L6 5.5 L1 10" fill="none" stroke="#8d8d8d" stroke-width="1.8"></path></svg>
+</button>
+</div>
+<div style="display: flex; border-radius: 4px; box-shadow: 0 0 0 1px #7b7b7b, 0 1px 0 rgba(255,255,255,0.5);">
+<button aria-label="Previous track" style="width: 32px; height: 23px; border: 0; padding: 0; border-radius: 4px 0 0 4px; border-right: 1px solid #8a8a8a; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center; color: #333;">
+<svg width="14" height="10" viewBox="0 0 22 14" aria-hidden="true"><rect x="1" y="1" width="2.5" height="12" fill="currentColor"></rect><path d="M12 1 L4 7 L12 13 Z" fill="currentColor"></path><path d="M21 1 L13 7 L21 13 Z" fill="currentColor"></path></svg>
+</button>
+<button aria-label="Pause" style="width: 36px; height: 23px; border: 0; padding: 0; border-right: 1px solid #8a8a8a; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center; color: #333;">
+<svg width="10" height="12" viewBox="0 0 12 14" aria-hidden="true"><rect x="1" y="1" width="3.5" height="12" fill="currentColor"></rect><rect x="7.5" y="1" width="3.5" height="12" fill="currentColor"></rect></svg>
+</button>
+<button aria-label="Next track" style="width: 32px; height: 23px; border: 0; padding: 0; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, #f6f6f6, #cfcfcf); display: flex; align-items: center; justify-content: center; color: #333;">
+<svg width="14" height="10" viewBox="0 0 22 14" aria-hidden="true"><path d="M1 1 L9 7 L1 13 Z" fill="currentColor"></path><path d="M10 1 L18 7 L10 13 Z" fill="currentColor"></path><rect x="18.5" y="1" width="2.5" height="12" fill="currentColor"></rect></svg>
+</button>
+</div>
+<div style="flex-grow: 1; display: flex; justify-content: center;">
+<a href="Main.dc.html" aria-label="Show the cassette deck" style="width: 380px; height: 34px; box-sizing: border-box; border-radius: 5px; padding: 3px 12px 0; text-decoration: none; color: #282a24; display: flex; flex-direction: column; align-items: center; background: linear-gradient(180deg, #f7f9ee, #d6dcc6); box-shadow: 0 0 0 1px #787c6e, inset 0 1px 2px rgba(0,0,0,0.18), 0 1px 0 rgba(255,255,255,0.6);">
+<span style="font-size: 11px; font-weight: 700; line-height: 13px;">The Lion's Roar</span>
+<span style="font-size: 10px; line-height: 12px; color: #464840;">First Aid Kit — The Lion's Roar</span>
+<div style="width: 300px; height: 3px; margin-top: 2px; border-radius: 2px; background: rgba(0,0,0,0.18);">
+<div style="width: 42%; height: 3px; border-radius: 2px; background: #3c4036;"></div>
+</div>
+</a>
+</div>
+<button aria-label="Search Spotify" onClick="{{goSearch}}" style="width: 210px; height: 22px; border: 0; padding: 0 8px; border-radius: 11px; display: flex; align-items: center; gap: 5px; background: #ffffff; box-shadow: inset 0 1px 2px rgba(0,0,0,0.35), 0 0 0 1px #8f8f8f, 0 1px 0 rgba(255,255,255,0.5); font: inherit; font-size: 12px; text-align: left; color: {{searchFg}};">
+<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="5" cy="5" r="3.8" fill="none" stroke="#6b6b6b" stroke-width="1.5"></circle><path d="M8 8 L11 11" stroke="#6b6b6b" stroke-width="1.8"></path></svg>
+<span style="flex-grow: 1;">{{searchText}}</span>
+</button>
+</div>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; display: flex;">
+
+<div style="width: 210px; flex-shrink: 0; box-sizing: border-box; padding: 8px 0; background: linear-gradient(180deg, #dde3ea, #d3dae2); border-right: 1px solid #a3abb6; display: flex; flex-direction: column;">
+<div style="padding: 4px 12px 3px; font: 700 11px/16px 'Lucida Grande', 'Open Sans', sans-serif; color: #4f5d6d; text-shadow: 0 1px 0 rgba(255,255,255,0.7);">LIBRARY</div>
+<sc-for list="{{library}}" as="s" hint-placeholder-count="3">
+<button onClick="{{s.go}}" style="height: 22px; border: 0; border-top: {{s.bt}}; padding: 0 10px 0 18px; display: flex; align-items: center; gap: 7px; font: inherit; font-size: 12px; font-weight: {{s.fw}}; text-align: left; background: {{s.bg}}; color: {{s.fg}}; text-shadow: {{s.ts}};">
+<span style="width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: {{s.ic}};">
+<sc-if value="{{s.isHeart}}" hint-placeholder-val="{{ false }}"><svg width="15" height="14" viewBox="0 0 16 15" aria-hidden="true"><path d="M8 14 L2.2 8.3 A3.3 3.3 0 0 1 8 3.6 A3.3 3.3 0 0 1 13.8 8.3 Z" fill="currentColor"></path></svg></sc-if>
+<sc-if value="{{s.isDisc}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.8" fill="currentColor"></circle><circle cx="8" cy="8" r="2" fill="#dde3ea"></circle></svg></sc-if>
+<sc-if value="{{s.isPerson}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5" r="3.2" fill="currentColor"></circle><path d="M1.8 15 C2.4 10.8 5 9.2 8 9.2 C11 9.2 13.6 10.8 14.2 15 Z" fill="currentColor"></path></svg></sc-if>
+</span>
+<span style="flex-grow: 1;">{{s.label}}</span>
+<span style="min-width: 16px; padding: 0 6px; height: 15px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 15px; text-align: center; background: {{s.badgeBg}}; color: {{s.badgeFg}};">{{s.badge}}</span>
+</button>
+</sc-for>
+<div style="padding: 14px 12px 3px; font: 700 11px/16px 'Lucida Grande', 'Open Sans', sans-serif; color: #4f5d6d; text-shadow: 0 1px 0 rgba(255,255,255,0.7);">PLAYLISTS</div>
+<sc-for list="{{playlists}}" as="s" hint-placeholder-count="5">
+<button onClick="{{s.go}}" style="height: 22px; border: 0; border-top: {{s.bt}}; padding: 0 10px 0 18px; display: flex; align-items: center; gap: 7px; font: inherit; font-size: 12px; font-weight: {{s.fw}}; text-align: left; background: {{s.bg}}; color: {{s.fg}}; text-shadow: {{s.ts}};">
+<span style="width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: {{s.ic}};">
+<svg width="15" height="14" viewBox="0 0 16 15" aria-hidden="true"><rect x="1" y="2" width="8" height="1.8" fill="currentColor"></rect><rect x="1" y="6" width="8" height="1.8" fill="currentColor"></rect><rect x="1" y="10" width="5" height="1.8" fill="currentColor"></rect><path d="M12 2 V10.5" stroke="currentColor" stroke-width="1.6"></path><circle cx="10.6" cy="11.4" r="2.2" fill="currentColor"></circle><path d="M12 2 L15 3.4" stroke="currentColor" stroke-width="1.6"></path></svg>
+</span>
+<span style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{s.label}}</span>
+</button>
+</sc-for>
+</div>
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #ffffff;">
+
+<sc-if value="{{isAlbums}}" hint-placeholder-val="{{ true }}">
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; background: linear-gradient(180deg, #fafafa, #e6e6e6); border-bottom: 1px solid #bdbdbd;">
+<span style="font-size: 13px; font-weight: 700; flex-grow: 1;">{{gridTitle}}</span>
+<span style="font-size: 11px; color: #555;">Sort by</span>
+<span style="margin-left: 6px; padding: 2px 18px 2px 8px; border-radius: 4px; font-size: 11px; background: linear-gradient(180deg, #ffffff, #e2e2e2); box-shadow: 0 0 0 1px #9a9a9a;">Recently Added ▾</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px 22px; padding: 20px 24px;">
+<sc-for list="{{albums}}" as="a" hint-placeholder-count="10">
+<button onClick="{{a.go}}" style="border: 0; padding: 0; background: none; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 6px; cursor: pointer;">
+<span style="position: relative; display: block; width: 100%; aspect-ratio: 1; background: {{a.cover}}; box-shadow: 0 2px 5px rgba(0,0,0,0.35);">
+<span style="position: absolute; left: 9px; right: 9px; bottom: 9px; font: 700 13px/1.1 Arimo, Helvetica, Arial, sans-serif; color: {{a.ink}}; letter-spacing: -0.2px;">{{a.coverText}}</span>
+</span>
+<span style="font-size: 11px; font-weight: 700; color: #1d1d1d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{a.title}}</span>
+<span style="font-size: 11px; color: #666; margin-top: -4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{a.artist}}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isArtists}}" hint-placeholder-val="{{ false }}">
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; background: linear-gradient(180deg, #fafafa, #e6e6e6); border-bottom: 1px solid #bdbdbd;">
+<span style="font-size: 13px; font-weight: 700; flex-grow: 1;">Artists you follow</span>
+<span style="font-size: 11px; color: #555;">Sort by</span>
+<span style="margin-left: 6px; padding: 2px 18px 2px 8px; border-radius: 4px; font-size: 11px; background: linear-gradient(180deg, #ffffff, #e2e2e2); box-shadow: 0 0 0 1px #9a9a9a;">Name ▾</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 22px 22px; padding: 22px 24px;">
+<sc-for list="{{artists}}" as="r" hint-placeholder-count="10">
+<button onClick="{{r.go}}" style="border: 0; padding: 0; background: none; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+<span style="width: 118px; height: 118px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: {{r.cover}}; box-shadow: 0 2px 5px rgba(0,0,0,0.35), inset 0 0 0 3px rgba(255,255,255,0.85); font: 700 34px/1 Arimo, Helvetica, Arial, sans-serif; color: rgba(255,255,255,0.92); text-shadow: 0 1px 2px rgba(0,0,0,0.35);">{{r.initials}}</span>
+<span style="font-size: 11px; font-weight: 700; color: #1d1d1d;">{{r.name}}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isList}}" hint-placeholder-val="{{ false }}">
+<div style="height: 168px; flex-shrink: 0; box-sizing: border-box; display: flex; gap: 20px; padding: 20px 22px; background: linear-gradient(180deg, #fbfbfb, #ebebeb); border-bottom: 1px solid #c9c9c9;">
+<sc-if value="{{coverHeart}}" hint-placeholder-val="{{ false }}">
+<div style="width: 128px; height: 128px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #8fb6ee, #3a63c4 60%, #2a3f8f); box-shadow: 0 2px 6px rgba(0,0,0,0.4);">
+<svg width="56" height="52" viewBox="0 0 16 15" aria-hidden="true"><path d="M8 14 L2.2 8.3 A3.3 3.3 0 0 1 8 3.6 A3.3 3.3 0 0 1 13.8 8.3 Z" fill="#ffffff"></path></svg>
+</div>
+</sc-if>
+<sc-if value="{{coverMosaic}}" hint-placeholder-val="{{ true }}">
+<div style="width: 128px; height: 128px; flex-shrink: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); box-shadow: 0 2px 6px rgba(0,0,0,0.4);">
+<span style="background: linear-gradient(135deg, #c9b48f, #6f5a3c);"></span>
+<span style="background: linear-gradient(135deg, #f0c25a, #d27a33 55%, #8f3b1f);"></span>
+<span style="background: linear-gradient(135deg, #9db8a3, #3f5f52);"></span>
+<span style="background: linear-gradient(135deg, #d8d2c4, #7a7466);"></span>
+</div>
+</sc-if>
+<sc-if value="{{coverAlbum}}" hint-placeholder-val="{{ false }}">
+<div style="position: relative; width: 128px; height: 128px; flex-shrink: 0; background: linear-gradient(135deg, #f0c25a 0%, #d27a33 55%, #8f3b1f 100%); box-shadow: 0 2px 6px rgba(0,0,0,0.4);">
+<span style="position: absolute; left: 10px; right: 10px; bottom: 10px; font: 700 15px/1.05 Arimo, Helvetica, Arial, sans-serif; color: #fff8ec;">THE LION'S ROAR</span>
+</div>
+</sc-if>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+<span style="font: 700 10px/14px 'Lucida Grande', 'Open Sans', sans-serif; letter-spacing: 0.8px; color: #5f5f5f;">{{listKind}}</span>
+<span style="font: 700 28px/32px Arimo, 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1d1d1d; letter-spacing: -0.4px;">{{listTitle}}</span>
+<span style="font-size: 12px; color: #4a4a4a;">{{listMeta}}</span>
+<span style="font-size: 12px; color: #5f5f5f; font-style: italic;">{{listDesc}}</span>
+<div style="flex-grow: 1;"></div>
+<div style="display: flex; gap: 8px;">
+<button style="height: 24px; padding: 0 16px; border: 0; border-radius: 12px; font: inherit; font-size: 12px; font-weight: 700; color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35); background: linear-gradient(180deg, #5d9ae6, #2c6bcc 50%, #1d58b8 51%, #3a78d6); box-shadow: 0 0 0 1px #24509a, inset 0 1px 0 rgba(255,255,255,0.45);">▶  Play</button>
+<button style="height: 24px; padding: 0 14px; border: 0; border-radius: 12px; font: inherit; font-size: 12px; color: #222; background: linear-gradient(180deg, #ffffff, #e3e3e3); box-shadow: 0 0 0 1px #9a9a9a, inset 0 1px 0 #ffffff;">Shuffle</button>
+<sc-if value="{{coverAlbum}}" hint-placeholder-val="{{ false }}">
+<button style="height: 24px; padding: 0 14px; border: 0; border-radius: 12px; font: inherit; font-size: 12px; color: #222; background: linear-gradient(180deg, #ffffff, #e3e3e3); box-shadow: 0 0 0 1px #9a9a9a, inset 0 1px 0 #ffffff;">♡ Save to Library</button>
+</sc-if>
+</div>
+</div>
+</div>
+<div style="height: 20px; flex-shrink: 0; display: grid; grid-template-columns: {{cols}}; align-items: center; font-size: 11px; color: #222; background: linear-gradient(180deg, #fdfdfd, #e3e3e3); border-bottom: 1px solid #b3b3b3;">
+<span style="text-align: right; padding-right: 8px; border-right: 1px solid #cfcfcf;">#</span>
+<span style="padding-left: 8px; border-right: 1px solid #cfcfcf;">Name</span>
+<sc-if value="{{showArtistCol}}" hint-placeholder-val="{{ true }}"><span style="padding-left: 8px; border-right: 1px solid #cfcfcf;">Artist</span></sc-if>
+<sc-if value="{{showArtistCol}}" hint-placeholder-val="{{ true }}"><span style="padding-left: 8px; border-right: 1px solid #cfcfcf;">Album</span></sc-if>
+<span style="text-align: right; padding-right: 10px;">Time</span>
+</div>
+<sc-for list="{{tracks}}" as="t" hint-placeholder-count="12">
+<div style="height: 20px; flex-shrink: 0; display: grid; grid-template-columns: {{t.cols}}; align-items: center; font-size: 12px; background: {{t.bg}}; color: {{t.fg}};">
+<span style="text-align: right; padding-right: 8px; color: {{t.numFg}};">
+<sc-if value="{{t.playing}}" hint-placeholder-val="{{ false }}"><svg width="13" height="11" viewBox="0 0 14 12" aria-hidden="true"><path d="M1 4 H4 L8 1 V11 L4 8 H1 Z" fill="currentColor"></path><path d="M10 3.5 Q12 6 10 8.5" fill="none" stroke="currentColor" stroke-width="1.4"></path></svg></sc-if>
+<sc-if value="{{t.idle}}" hint-placeholder-val="{{ true }}">{{t.n}}</sc-if>
+</span>
+<span style="padding-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.title}}</span>
+<sc-if value="{{t.showArtist}}" hint-placeholder-val="{{ true }}"><span style="padding-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.artist}}</span></sc-if>
+<sc-if value="{{t.showArtist}}" hint-placeholder-val="{{ true }}"><span style="padding-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.album}}</span></sc-if>
+<span style="text-align: right; padding-right: 10px;">{{t.time}}</span>
+</div>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{isArtist}}" hint-placeholder-val="{{ false }}">
+<div style="position: relative; height: 170px; flex-shrink: 0; box-sizing: border-box; padding: 0 26px 20px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; background: radial-gradient(ellipse at 75% 30%, rgba(255,214,150,0.45), rgba(255,214,150,0) 55%), linear-gradient(135deg, #7a5532, #3a2414 60%, #1e130b); box-shadow: inset 0 -1px 0 rgba(0,0,0,0.4);">
+<span style="font: 700 10px/14px 'Lucida Grande', 'Open Sans', sans-serif; letter-spacing: 1px; color: rgba(255,255,255,0.85);">ARTIST</span>
+<div style="display: flex; align-items: flex-end; gap: 16px;">
+<span style="font: 700 44px/1 Arimo, 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #ffffff; letter-spacing: -0.8px; text-shadow: 0 2px 6px rgba(0,0,0,0.5);">First Aid Kit</span>
+<button style="height: 22px; margin-bottom: 4px; padding: 0 14px; border: 0; border-radius: 11px; font: inherit; font-size: 11px; font-weight: 700; color: #ffffff; background: rgba(255,255,255,0.16); box-shadow: 0 0 0 1px rgba(255,255,255,0.6), inset 0 1px 0 rgba(255,255,255,0.25);">✓ Following</button>
+</div>
+</div>
+<div style="flex-grow: 1; display: flex; gap: 26px; padding: 16px 26px;">
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+<span style="font-size: 13px; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid #dcdcdc;">Popular</span>
+<sc-for list="{{popular}}" as="t" hint-placeholder-count="5">
+<div style="height: 34px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ededed; font-size: 12px;">
+<span style="width: 14px; text-align: right; color: #6b6b6b;">{{t.n}}</span>
+<span style="width: 26px; height: 26px; flex-shrink: 0; background: {{t.cover}}; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);"></span>
+<span style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.title}}</span>
+<span style="color: #5f5f5f; width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.album}}</span>
+<span style="width: 34px; text-align: right; color: #5f5f5f;">{{t.time}}</span>
+</div>
+</sc-for>
+</div>
+<div style="width: 300px; flex-shrink: 0; display: flex; flex-direction: column;">
+<span style="font-size: 13px; font-weight: 700; padding-bottom: 8px; border-bottom: 1px solid #dcdcdc;">Albums</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 12px; padding-top: 12px;">
+<sc-for list="{{artistAlbums}}" as="a" hint-placeholder-count="6">
+<button onClick="{{a.go}}" style="border: 0; padding: 0; background: none; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 4px; cursor: pointer;">
+<span style="display: block; width: 100%; aspect-ratio: 1; background: {{a.cover}}; box-shadow: 0 2px 4px rgba(0,0,0,0.35);"></span>
+<span style="font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{a.title}}</span>
+<span style="font-size: 10px; color: #666; margin-top: -3px;">{{a.year}}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{isSearch}}" hint-placeholder-val="{{ false }}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px; padding: 16px 24px;">
+<span style="font: 700 20px/24px Arimo, 'Helvetica Neue', Helvetica, Arial, sans-serif;">Results for “lion”</span>
+<div style="display: flex; gap: 22px;">
+<div style="width: 250px; flex-shrink: 0; box-sizing: border-box; padding: 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 6px; background: linear-gradient(180deg, #f7f7f7, #e9e9e9); box-shadow: 0 0 0 1px #d0d0d0, inset 0 1px 0 #ffffff;">
+<span style="font: 700 10px/14px 'Lucida Grande', 'Open Sans', sans-serif; letter-spacing: 0.8px; color: #5f5f5f;">TOP RESULT</span>
+<div style="display: flex; gap: 12px; align-items: flex-end;">
+<span style="width: 92px; height: 92px; flex-shrink: 0; background: linear-gradient(135deg, #74b072, #2e6a3b); box-shadow: 0 2px 5px rgba(0,0,0,0.35);"></span>
+<button style="height: 24px; padding: 0 14px; border: 0; border-radius: 12px; font: inherit; font-size: 12px; font-weight: 700; color: #ffffff; text-shadow: 0 -1px 0 rgba(0,0,0,0.35); background: linear-gradient(180deg, #5d9ae6, #2c6bcc 50%, #1d58b8 51%, #3a78d6); box-shadow: 0 0 0 1px #24509a, inset 0 1px 0 rgba(255,255,255,0.45);">▶  Play</button>
+</div>
+<span style="font-size: 15px; font-weight: 700;">The Lion Sleeps Tonight</span>
+<span style="font-size: 11px; color: #555; margin-top: -5px;">Song · The Tokens</span>
+</div>
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+<span style="font-size: 13px; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid #dcdcdc;">Songs</span>
+<sc-for list="{{songResults}}" as="t" hint-placeholder-count="4">
+<div style="height: 34px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #ededed; font-size: 12px;">
+<span style="width: 26px; height: 26px; flex-shrink: 0; background: {{t.cover}}; box-shadow: 0 0 0 1px rgba(0,0,0,0.2);"></span>
+<span style="flex-grow: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.title}}</span>
+<span style="width: 190px; color: #5f5f5f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{t.artist}}</span>
+<span style="width: 34px; text-align: right; color: #5f5f5f;">{{t.time}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<span style="font-size: 13px; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid #dcdcdc;">Artists</span>
+<div style="display: flex; gap: 26px;">
+<sc-for list="{{artistResults}}" as="r" hint-placeholder-count="4">
+<button onClick="{{r.go}}" style="border: 0; padding: 0; background: none; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;">
+<span style="width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: {{r.cover}}; box-shadow: 0 2px 4px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(255,255,255,0.85); font: 700 22px/1 Arimo, Helvetica, Arial, sans-serif; color: rgba(255,255,255,0.92);">{{r.initials}}</span>
+<span style="font-size: 11px; font-weight: 700;">{{r.name}}</span>
+</button>
+</sc-for>
+</div>
+<span style="font-size: 13px; font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid #dcdcdc;">Albums</span>
+<div style="display: flex; gap: 20px;">
+<sc-for list="{{albumResults}}" as="a" hint-placeholder-count="4">
+<button onClick="{{a.go}}" style="width: 104px; border: 0; padding: 0; background: none; font: inherit; text-align: left; display: flex; flex-direction: column; gap: 4px; cursor: pointer;">
+<span style="display: block; width: 104px; height: 104px; background: {{a.cover}}; box-shadow: 0 2px 4px rgba(0,0,0,0.35);"></span>
+<span style="font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{a.title}}</span>
+<span style="font-size: 10px; color: #666; margin-top: -3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{a.artist}}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+</div>
+</div>
+
+<div style="height: 26px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; position: relative; background: linear-gradient(180deg, #d4d4d4, #aaaaaa); border-top: 1px solid #7e7e7e; box-shadow: inset 0 1px 0 rgba(255,255,255,0.55);">
+<span style="font-size: 11px; color: #2f2f2f; text-shadow: 0 1px 0 rgba(255,255,255,0.55);">{{status}}</span>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"view":{"editor":"enum","default":"albums","options":["albums","artists","liked","playlist","album","artist","search"]},"$preview":{"width":1140,"height":740}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var st = this.state || {};
+    var view = st.view || this.props.view || 'albums';
+    var source = st.source !== undefined ? st.source : ({ albums: 'Albums', artists: 'Artists', liked: 'Liked Songs', playlist: 'Sunday Morning' })[view] || '';
+    function go(v, src) { return function () { self.setState({ view: v, source: src }); }; }
+
+    var C = {
+      roar: 'linear-gradient(135deg, #f0c25a, #d27a33 55%, #8f3b1f)',
+      bonIver: 'linear-gradient(135deg, #c9b48f, #6f5a3c)',
+      fleet: 'linear-gradient(135deg, #9db8a3, #3f5f52)',
+      adele: 'linear-gradient(135deg, #d8d2c4, #7a7466)',
+      lana: 'linear-gradient(135deg, #4f6f8f, #1f2f43)',
+      m83: 'linear-gradient(135deg, #6a4e9b, #e07a5f)',
+      frank: 'linear-gradient(135deg, #ff9b3d, #e2571e)',
+      mumford: 'linear-gradient(135deg, #5b4a3a, #2b211a)',
+      arcade: 'linear-gradient(135deg, #b9b4a5, #5e6b73)',
+      florence: 'linear-gradient(135deg, #2c3e50, #8e44ad)',
+      stayGold: 'linear-gradient(135deg, #f3d36b, #b98a2a)',
+      ruins: 'linear-gradient(135deg, #9fb7c9, #4c6276)',
+      palomino: 'linear-gradient(135deg, #e9a8a0, #8d4a5c)',
+      bigBlack: 'linear-gradient(135deg, #39424e, #11161c)',
+      lionKing: 'linear-gradient(135deg, #f6b042, #c4401c)',
+      lionheart: 'linear-gradient(135deg, #d8c3a5, #7b5c4a)',
+      cobra: 'linear-gradient(135deg, #98c1d9, #3d5a80)',
+      tokens: 'linear-gradient(135deg, #74b072, #2e6a3b)',
+      lionel: 'linear-gradient(135deg, #d4a373, #7f5539)',
+      lionBabe: 'linear-gradient(135deg, #e5989b, #6d597a)',
+      porter: 'linear-gradient(135deg, #8ecae6, #219ebc)'
+    };
+
+    function sourceRow(label, kind, badge, target) {
+      var on = source === label;
+      return {
+        label: label, badge: badge || '',
+        isHeart: kind === 'heart', isDisc: kind === 'disc', isPerson: kind === 'person',
+        go: go(target, label),
+        bg: on ? 'linear-gradient(180deg, #6197e1, #2f69c6)' : 'transparent',
+        bt: on ? '1px solid #4a80d4' : '1px solid transparent',
+        fg: on ? '#ffffff' : '#1d1d1d',
+        ic: on ? '#ffffff' : '#5a6b80',
+        fw: on ? '700' : '400',
+        ts: on ? '0 1px 1px rgba(0,0,0,0.35)' : 'none',
+        badgeBg: badge ? (on ? '#ffffff' : '#8796ab') : 'transparent',
+        badgeFg: on ? '#2f69c6' : '#ffffff'
+      };
+    }
+    var library = [
+      sourceRow('Liked Songs', 'heart', '248', 'liked'),
+      sourceRow('Albums', 'disc', '', 'albums'),
+      sourceRow('Artists', 'person', '', 'artists')
+    ];
+    var playlists = ['Sunday Morning', 'Road Trip 2011', 'Focus', "Mom's Favorites", 'Rainy Days', 'Kitchen Dancing'].map(function (n) {
+      return sourceRow(n, 'list', '', 'playlist');
+    });
+
+    var albumData = [
+      ["The Lion's Roar", 'First Aid Kit', C.roar, '#fff8ec'],
+      ['Bon Iver, Bon Iver', 'Bon Iver', C.bonIver, '#fffaf0'],
+      ['Helplessness Blues', 'Fleet Foxes', C.fleet, '#f7fff9'],
+      ['21', 'Adele', C.adele, '#2b2925'],
+      ['Born to Die', 'Lana Del Rey', C.lana, '#eef4fb'],
+      ["Hurry Up, We're Dreaming", 'M83', C.m83, '#fff6f0'],
+      ['Channel Orange', 'Frank Ocean', C.frank, '#fffaf2'],
+      ['Sigh No More', 'Mumford & Sons', C.mumford, '#f3e9dc'],
+      ['The Suburbs', 'Arcade Fire', C.arcade, '#1e2326'],
+      ['Ceremonials', 'Florence + the Machine', C.florence, '#f5ecff']
+    ];
+    var albums = albumData.map(function (a) {
+      return { title: a[0], artist: a[1], cover: a[2], ink: a[3], coverText: a[0].toUpperCase(), go: go('album', '') };
+    });
+
+    function initials(n) { return n.replace(/[^A-Za-z ]/g, '').split(' ').filter(function (w) { return w && w !== 'the' && w !== 'and'; }).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(''); }
+    var artistData = [['First Aid Kit', C.roar], ['Bon Iver', C.bonIver], ['Fleet Foxes', C.fleet], ['Adele', C.adele], ['Lana Del Rey', C.lana], ['M83', C.m83], ['Frank Ocean', C.frank], ['Mumford & Sons', C.mumford], ['Arcade Fire', C.arcade], ['Florence + the Machine', C.florence]];
+    var artists = artistData.map(function (r) { return { name: r[0], cover: r[1], initials: initials(r[0]), go: go('artist', '') }; });
+
+    var mix = [
+      ['Holocene', 'Bon Iver', 'Bon Iver, Bon Iver', '5:36'],
+      ["The Lion's Roar", 'First Aid Kit', "The Lion's Roar", '4:05'],
+      ['Helplessness Blues', 'Fleet Foxes', 'Helplessness Blues', '5:04'],
+      ['Someone Like You', 'Adele', '21', '4:45'],
+      ['Video Games', 'Lana Del Rey', 'Born to Die', '4:42'],
+      ['Midnight City', 'M83', "Hurry Up, We're Dreaming", '4:03'],
+      ['Thinkin Bout You', 'Frank Ocean', 'Channel Orange', '3:20'],
+      ['The Cave', 'Mumford & Sons', 'Sigh No More', '3:38'],
+      ['Ready to Start', 'Arcade Fire', 'The Suburbs', '4:15'],
+      ['Shake It Out', 'Florence + the Machine', 'Ceremonials', '4:37']
+    ];
+    var roarTracks = [
+      ["The Lion's Roar", '4:05'], ['Emmylou', '4:16'], ['In the Hearts of Men', '4:08'], ['Blue', '3:48'],
+      ['This Old Routine', '4:52'], ['To a Poet', '6:02'], ['I Found a Way', '3:41'], ['Dance to Another Tune', '3:30'],
+      ["New Year's Eve", '3:59'], ['King of the World', '3:43']
+    ];
+    var isAlbumView = view === 'album';
+    var rows = isAlbumView
+      ? roarTracks.map(function (t) { return [t[0], 'First Aid Kit', "The Lion's Roar", t[1]]; })
+      : (view === 'liked' ? mix.slice().reverse() : mix);
+    var cols = isAlbumView ? '44px minmax(0, 1fr) 64px' : '44px minmax(0, 2.2fr) minmax(0, 1.4fr) minmax(0, 1.6fr) 64px';
+    var tracks = rows.map(function (r, i) {
+      var playing = r[0] === "The Lion's Roar";
+      var selected = i === 4;
+      return {
+        n: i + 1, title: r[0], artist: r[1], album: r[2], time: r[3],
+        playing: playing, idle: !playing, showArtist: !isAlbumView, cols: cols,
+        bg: selected ? 'linear-gradient(180deg, #5b8fdc, #3570cf)' : (i % 2 ? '#f1f5fa' : '#ffffff'),
+        fg: selected ? '#ffffff' : '#1d1d1d',
+        numFg: selected ? '#ffffff' : (playing ? '#2f6fd1' : '#6b6b6b')
+      };
+    });
+
+    var listHeads = {
+      playlist: ['PLAYLIST', source && source !== 'Liked Songs' ? source : 'Sunday Morning', 'Zepto · 10 songs, 44 min', 'Slow songs for slow mornings.'],
+      liked: ['PLAYLIST', 'Liked Songs', '248 songs · the newest first', 'Everything you hearted in Spotify, on any device.'],
+      album: ['ALBUM', "The Lion's Roar", 'First Aid Kit · 2012 · 10 songs, 41 min', '']
+    };
+    var head = listHeads[view] || listHeads.playlist;
+
+    var statusByView = {
+      albums: '10 albums', artists: '10 artists', playlist: '10 songs, 44 minutes', liked: '248 songs, 16.9 hours',
+      album: '10 songs, 41 minutes', artist: 'First Aid Kit · 5 albums', search: '4 songs, 4 artists, 4 albums'
+    };
+
+    return {
+      library: library, playlists: playlists, albums: albums, artists: artists, tracks: tracks,
+      isAlbums: view === 'albums', isArtists: view === 'artists',
+      isList: view === 'playlist' || view === 'liked' || view === 'album',
+      isArtist: view === 'artist', isSearch: view === 'search',
+      gridTitle: 'Albums',
+      coverHeart: view === 'liked', coverMosaic: view === 'playlist', coverAlbum: isAlbumView,
+      listKind: head[0], listTitle: head[1], listMeta: head[2], listDesc: head[3],
+      showArtistCol: !isAlbumView,
+      cols: cols,
+      popular: [
+        ["The Lion's Roar", "The Lion's Roar", '4:05', C.roar],
+        ['My Silver Lining', 'Stay Gold', '3:39', C.stayGold],
+        ['Emmylou', "The Lion's Roar", '4:16', C.roar],
+        ['Fireworks', 'Ruins', '4:01', C.ruins],
+        ['Angel', 'Palomino', '3:42', C.palomino]
+      ].map(function (t, i) { return { n: i + 1, title: t[0], album: t[1], time: t[2], cover: t[3] }; }),
+      artistAlbums: [
+        ['Palomino', '2022', C.palomino], ['Ruins', '2018', C.ruins], ['Stay Gold', '2014', C.stayGold],
+        ["The Lion's Roar", '2012', C.roar], ['The Big Black & the Blue', '2010', C.bigBlack]
+      ].map(function (a) { return { title: a[0], year: a[1], cover: a[2], go: go('album', '') }; }),
+      songResults: [
+        ['The Lion Sleeps Tonight', 'The Tokens', '2:41', C.tokens],
+        ["The Lion's Roar", 'First Aid Kit', '4:05', C.roar],
+        ['Lionhearted', 'Porter Robinson, Urban Cone', '4:28', C.porter],
+        ['Circle of Life', 'Carmen Twillie, Lebo M.', '3:58', C.lionKing]
+      ].map(function (t) { return { title: t[0], artist: t[1], time: t[2], cover: t[3] }; }),
+      artistResults: [['Lionel Richie', C.lionel], ['LION BABE', C.lionBabe], ['First Aid Kit', C.roar], ['The Tokens', C.tokens]]
+        .map(function (r) { return { name: r[0], cover: r[1], initials: initials(r[0]), go: go('artist', '') }; }),
+      albumResults: [
+        ['The Lion King (Soundtrack)', 'Various Artists', C.lionKing], ["The Lion's Roar", 'First Aid Kit', C.roar],
+        ['Lionheart', 'Kate Bush', C.lionheart], ['The Lion and the Cobra', "Sinéad O'Connor", C.cobra]
+      ].map(function (a) { return { title: a[0], artist: a[1], cover: a[2], go: go('album', '') }; }),
+      searchText: view === 'search' ? 'lion' : 'Search Spotify',
+      searchFg: view === 'search' ? '#1d1d1d' : '#8a8a8a',
+      status: statusByView[view] || '',
+      goAlbums: go('albums', 'Albums'),
+      goSearch: go('search', ''),
+      goAlbum: go('album', ''),
+      goArtist: go('artist', '')
+    };
+  }
+}
+</script>
+</body>
+</html>
