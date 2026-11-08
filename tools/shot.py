@@ -21,9 +21,15 @@ wins = [w for w in CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWin
 if not wins:
     sys.exit("no window for %r" % owner)
 wins.sort(key=lambda w: -w["kCGWindowBounds"]["Width"] * w["kCGWindowBounds"]["Height"])
-for i, w in enumerate(wins[:int(sys.argv[2])]):
-    subprocess.check_call(["screencapture", "-x", "-o", "-l%d" % w["kCGWindowNumber"], "/tmp/lk-shot-%d.png" % i])
-    print("/tmp/lk-shot-%d.png %s" % (i, w.get("kCGWindowName", "")))
+n = 0
+for w in wins:
+    if n == int(sys.argv[2]):
+        break
+    # hidden or off-screen windows can't be captured; skip them instead of giving up
+    if subprocess.call(["screencapture", "-x", "-o", "-l%d" % w["kCGWindowNumber"], "/tmp/lk-shot-%d.png" % n],
+                       stderr=open("/dev/null", "w")) == 0:
+        print("/tmp/lk-shot-%d.png %s" % (n, w.get("kCGWindowName", "")))
+        n += 1
 '''
 
 

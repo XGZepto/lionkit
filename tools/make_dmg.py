@@ -37,6 +37,9 @@ ABOUT = {
         u"Instead, it shows what’s playing on your phone, a speaker or another computer, and it "
         u"lets you control that playback or move it to another device. Controlling playback needs a "
         u"Spotify Premium account.",
+        u"Spotify only lets 25 accounts that I add by hand sign in through my copy of Kassett. If "
+        u"yours isn’t one of them, the login fails. You can then create your own free Spotify "
+        u"app and give Kassett its Client ID, and the website explains how to do that.",
         u"Kassett isn’t made by Spotify or affiliated with it.",
     ],
     "page.zepto.planchette": [
@@ -172,8 +175,8 @@ def draw_background(path, name):
 def write_readme(path, info):
     name = info["CFBundleName"]
     words = {"name": name, "log": "Library/Logs/%s.log" % info["CFBundleExecutable"]}
-    paragraphs = ABOUT.get(info["CFBundleIdentifier"], [])[:1] + [p % words for p in GENERAL] + \
-        ABOUT.get(info["CFBundleIdentifier"], [])[1:]
+    about = ABOUT.get(info["CFBundleIdentifier"], [])
+    paragraphs = about[:-1] + [p % words for p in GENERAL] + about[-1:]  # the disclaimer goes last
     style = NSMutableParagraphStyle.alloc().init()
     style.setParagraphSpacing_(9)
     style.setLineSpacing_(1.5)
@@ -328,6 +331,8 @@ def make(app, out_dir):
         for entity in attached["system-entities"]:
             if entity.get("mount-point"):
                 volume, device = entity["mount-point"], entity["dev-entry"]
+        NSFileManager.defaultManager().setAttributes_ofItemAtPath_error_(
+            {NSFileExtensionHidden: True}, os.path.join(volume, README), None)  # "Read Me First", no ".rtf"
         with open(os.path.join(volume, ".DS_Store"), "wb") as f:
             f.write(window_store(volume, os.path.basename(app).decode("utf-8")))
         if os.path.exists(os.path.join(volume, ".VolumeIcon.icns")):

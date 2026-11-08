@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planchette 0.4 · LionKit Apps</title>
+<meta name="description" content="A Markdown editor for blogs that run on Ghost.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="store.css">
+</head>
+<body>
+<p class="back-home"><a href="../">‹ LionKit home</a></p>
+<div class="store">
+<div class="store-top">
+<div class="titlebar"><div class="lights" aria-hidden="true"><span></span><span></span><span></span></div><h1>LionKit Apps</h1></div>
+<nav class="toolbar" aria-label="Apps">
+<a class="tb-back" href="./" aria-label="Back to all apps"><svg width="8" height="11" viewBox="0 0 8 11" aria-hidden="true"><path d="M7 1 L2 5.5 L7 10" fill="none" stroke="#333" stroke-width="1.8"></path></svg></a>
+<div class="segmented">
+<a href="./">Featured</a>
+<a href="./#apps" aria-current="page">Apps</a>
+<a href="./#widgets">Widgets</a>
+</div>
+<span class="tb-spacer"></span>
+</nav>
+</div>
+
+<main class="product">
+<aside class="side">
+<img class="icon" src="../img/planchette-icon.png" alt="Planchette icon">
+<a class="price" href="https://github.com/XGZepto/lionkit/releases/download/planchette-v0.4/Planchette-0.4.dmg"><span class="idle">Free</span><span class="act">Download</span><span class="visually-hidden" style="position:absolute;left:-9999px">Planchette 0.4</span></a>
+<h2>Information</h2>
+<dl class="info">
+<div><dt>Category:</dt><dd>Productivity</dd></div>
+<div><dt>Updated:</dt><dd>November 8, 2026</dd></div>
+<div><dt>Version:</dt><dd>0.4</dd></div>
+<div><dt>Price:</dt><dd>Free</dd></div>
+<div><dt>Language:</dt><dd>English</dd></div>
+<div><dt>Developer:</dt><dd>XGZepto</dd></div>
+<div><dt>License:</dt><dd>MIT</dd></div>
+</dl>
+<h2>Requirements</h2>
+<p class="req">Mac OS X Lion 10.7.5 on an Intel Mac, a blog that runs on Ghost, and an Admin API key from it.</p>
+<h2>More from XGZepto</h2>
+<ul class="more-list">
+<li><img src="../img/kassett-icon.png" alt=""><a href="kassett.html">Kassett<span>Music</span></a></li>
+<li><img src="../img/latchkey-icon.png" alt=""><a href="latchkey.html">Latchkey<span>Utilities</span></a></li>
+<li><img src="../img/forecast-icon.svg" alt=""><a href="forecast.html">Forecast<span>Dashboard Widgets</span></a></li>
+</ul>
+</aside>
+<div class="main">
+<h1>Planchette</h1>
+<p class="by">By XGZepto · A Markdown editor for blogs that run on Ghost.</p>
+<h2>Screenshots</h2>
+<div class="shots">
+<div class="shots-track">
+<figure><img src="../img/shots/planchette-blog.png" alt="Editing a post from my blog, with the preview on the right" loading="lazy"><figcaption>Editing a post from my blog, with the preview on the right</figcaption></figure>
+<figure><img src="../img/shots/planchette-editor.png" alt="A new post that stays on the Mac until I save it to the blog" loading="lazy"><figcaption>A new post that stays on the Mac until I save it to the blog</figcaption></figure>
+<figure><img src="../img/shots/planchette-chinese.png" alt="Chinese posts get even line spacing" loading="lazy"><figcaption>Chinese posts get even line spacing</figcaption></figure>
+</div>
+<button class="shots-nav prev" aria-label="Previous screenshot">‹</button><button class="shots-nav next" aria-label="Next screenshot">›</button>
+<div class="dots"><button aria-label="Screenshot 1"></button><button aria-label="Screenshot 2"></button><button aria-label="Screenshot 3"></button></div>
+</div>
+<h2>Description</h2>
+<p>Planchette is a Markdown editor for blogs that run on Ghost. I write on the left, the preview on the right scrolls along with me, and the sidebar keeps drafts, scheduled posts and published posts in separate groups.</p>
+<p>Edits sync in both directions. A change I make in Ghost&#x27;s web editor shows up in Planchette, and if a post changed on the web after I opened it, Planchette asks before it overwrites anything. Pictures work too, including WebP files that Lion can&#x27;t open by itself.</p>
+<p>Planchette is named after the pointer on a spirit board, which people used to fit with a pencil for spirit writing. 👻</p>
+<h2>What's New in Version 0.4</h2>
+<ul>
+<li>Long titles wrap, and the header scrolls away with the text.</li>
+<li>Full screen writing that keeps the preview next to you.</li>
+<li>A find bar.</li>
+<li>Drag pictures into a post or paste them.</li>
+<li>Schedule a post to go out later.</li>
+<li>Chinese, Japanese and Korean text gets even line spacing.</li>
+<li>Posts from the blog convert to Markdown without losing spaces or formatting.</li>
+</ul>
+</div>
+</main>
+<footer class="store-foot">Every LionKit app is free and open source under the MIT license. The source code is on <a href="https://github.com/XGZepto/lionkit">GitHub</a>. LionKit isn't affiliated with Apple, Spotify or the Ghost Foundation.</footer>
+</div>
+<script>
+(function () {
+  var track = document.querySelector('.shots-track');
+  if (!track) return;
+  var figs = track.querySelectorAll('figure'), dots = document.querySelectorAll('.dots button');
+  function current() { return Math.round(track.scrollLeft / track.clientWidth); }
+  function go(i) { i = Math.max(0, Math.min(figs.length - 1, i)); track.scrollTo({ left: i * track.clientWidth }); }
+  function mark() { var c = current(); dots.forEach(function (d, i) { d.setAttribute('aria-current', i === c ? 'true' : 'false'); }); }
+  document.querySelector('.shots-nav.prev').addEventListener('click', function () { go(current() - 1); });
+  document.querySelector('.shots-nav.next').addEventListener('click', function () { go(current() + 1); });
+  dots.forEach(function (d, i) { d.addEventListener('click', function () { go(i); }); });
+  track.addEventListener('scroll', function () { window.requestAnimationFrame(mark); });
+  mark();
+})();
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@ follows Lion's own look.
 |---|---|
 | Planchette (`apps/Planchette`) | A Markdown editor for blogs that run on Ghost. It keeps a post list in sync in both directions, shows a live preview, and has an inspector for the slug, excerpt, tags and feature image. |
 | Kassett (`apps/Kassett`) | A remote for Spotify Connect in the style of iTunes 10, with a menu for moving playback between devices. Its cassette-deck redesign is in `design/kassett/`. |
-| WiFiFix (`system/WiFiFix`) | Lets Lion join Wi-Fi networks that offer WPA2 and WPA3 together. Without it, Lion mistakes them for WPA2 Enterprise and won't connect. |
+| Latchkey (`system/Latchkey`) | Lets Lion join Wi-Fi networks that offer WPA2 and WPA3 together. Without it, Lion mistakes them for WPA2 Enterprise and won't connect. |
 | lionkit (`lionkit/`) | The shared library behind the apps: HTTPS through curl, the keychain, the Ghost and Spotify APIs, Markdown, and Cocoa helpers. |
 
 If you want to help (person or agent), read [`CLAUDE.md`](CLAUDE.md) first and then pick a

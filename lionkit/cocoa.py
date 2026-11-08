@@ -74,6 +74,8 @@ def build_main_menu(app_name, delegate, file_items=(), view_items=(), has_prefs=
 
     m = submenu(app_name)
     _item(m, u"About " + app_name, "orderFrontStandardAboutPanel:")
+    from lionkit import updates  # imported here: updates uses this module's in_background
+    updates.install(m, 1)
     m.addItem_(NSMenuItem.separatorItem())
     if has_prefs:
         _item(m, u"Preferences…", "showPreferences:", ",", target=delegate)

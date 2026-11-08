@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-"""WiFiFix: keeps a Lion Mac on Wi-Fi networks that offer WPA2 and WPA3 together.
+"""Latchkey: keeps a Lion Mac on Wi-Fi networks that offer WPA2 and WPA3 together.
 
-Lion files such "transition" networks under WPA2 Enterprise and won't join them. WiFiFix lives in
+Lion files such "transition" networks under WPA2 Enterprise and won't join them. Latchkey lives in
 the menu bar: choose the network, type its password once (it goes into the login keychain), and
-WiFiFix joins it with plain WPA2. Whenever the Mac drops off Wi-Fi and Lion doesn't get it back,
-WiFiFix rejoins a remembered network. It leaves the Mac alone while Wi-Fi is off or on another
+Latchkey joins it with plain WPA2. Whenever the Mac drops off Wi-Fi and Lion doesn't get it back,
+Latchkey rejoins a remembered network. It leaves the Mac alone while Wi-Fi is off or on another
 network.
 
-For screenshots without real network names: `defaults write page.zepto.wififix Demo -bool YES`
+For screenshots without real network names: `defaults write page.zepto.latchkey Demo -bool YES`
 (see README.md for the other demo settings)."""
 from __future__ import print_function
 
 import math
 import os
-import shutil
-import subprocess
 import sys
 import time
 
@@ -28,8 +26,8 @@ from lionkit import cocoa, keychain
 import art
 import wifi
 
-APP_NAME = "WiFiFix"
-SERVICE = "WiFiFix"  # keychain service; the account is the network name
+APP_NAME = "Latchkey"
+SERVICE = "Latchkey"  # keychain service; the account is the network name
 POLL = 5.0           # seconds between status checks (no scanning)
 SETTLE = 8           # after a drop, a wake or Wi-Fi coming on, give Lion this long to rejoin by itself
 RETRY = 30           # seconds between searches while no remembered network is in range
@@ -37,10 +35,6 @@ BACKOFF = (30, 60, 120, 300)  # after 1, 2, 3, 4+ failed joins in a row
 MENU_W = 290
 ROW_H = 19
 NO_PASSWORD = 3
-# Where wififix.sh installed itself. WiFiFix only checks that the plist exists and can remove both;
-# it never reads the folder, which holds the old helper's password in a plain file.
-OLD_PLIST = os.path.expanduser("~/Library/LaunchAgents/local.wififix.plist")
-OLD_DIR = os.path.expanduser("~/Library/WiFiFix")
 
 
 def log(*parts):
@@ -79,7 +73,7 @@ def failure_text(code):
     if code == wifi.NO_WPA2:
         return u"Its access points only offer WPA3, which Lion can't use."
     if code == NO_PASSWORD:
-        return u"WiFiFix doesn't have its password."
+        return u"Latchkey doesn't have its password."
     if code in (-3905, -3912, -3924, -3925):
         return u"The password may be wrong, or the signal is too weak."
     if code == -3930:
@@ -337,21 +331,21 @@ def checkbox(title, frame, target, action):
 def panel_text(mode, ssid, kind):
     if mode == "other":
         return (u"Find and join a Wi-Fi network.",
-                u"Enter the network's name and password. WiFiFix also finds networks that hide their name.")
+                u"Enter the network's name and password. Latchkey also finds networks that hide their name.")
     if mode == "save":
         return (u"This Mac is already on %s." % q(ssid),
-                u"Enter the network's password, and WiFiFix will use it to rejoin whenever the connection "
+                u"Enter the network's password, and Latchkey will use it to rejoin whenever the connection "
                 u"drops. The password is kept in your keychain.")
     if mode == "retry":
-        return (u"WiFiFix couldn't join %s." % q(ssid),
-                u"Enter the network's password again. WiFiFix keeps the new password in your keychain "
+        return (u"Latchkey couldn't join %s." % q(ssid),
+                u"Enter the network's password again. Latchkey keeps the new password in your keychain "
                 u"once it works.")
     if kind == wifi.TRANSITION:
         return (u"%s uses WPA2 and WPA3, which Lion can't join on its own." % q(ssid),
-                u"Enter the network's password, and WiFiFix will join it with WPA2 now and rejoin it "
+                u"Enter the network's password, and Latchkey will join it with WPA2 now and rejoin it "
                 u"whenever the connection drops. The password is kept in your keychain.")
     return (u"The Wi-Fi network %s requires a password." % q(ssid),
-            u"WiFiFix will join it now and rejoin it whenever the connection drops. The password is "
+            u"Latchkey will join it now and rejoin it whenever the connection drops. The password is "
             u"kept in your keychain.")
 
 
@@ -416,7 +410,7 @@ class JoinPanel(NSObject):
         self.loginBox = None
         if self.ask_login:
             y -= 22
-            self.loginBox = checkbox(u"Open WiFiFix at login", NSMakeRect(fx - 2, y, fw, 18), None, None)
+            self.loginBox = checkbox(u"Open Latchkey at login", NSMakeRect(fx - 2, y, fw, 18), None, None)
             self.loginBox.setState_(NSOnState)
             v.addSubview_(self.loginBox)
 
@@ -548,7 +542,7 @@ def shake(window):
 
 
 # ---- the app --------------------------------------------------------------------------------------
-class WiFiFix(NSObject):
+class Latchkey(NSObject):
 
     def applicationDidFinishLaunching_(self, note):
         d = self.defaults = NSUserDefaults.standardUserDefaults()
@@ -560,7 +554,7 @@ class WiFiFix(NSObject):
         else:
             self.wifi, self.store, self.login_items = wifi.CoreWLAN(), Store(d), LoginItems()
         self.status = self.wifi.status()
-        self.phase = None      # "search" or "join" while WiFiFix is working
+        self.phase = None      # "search" or "join" while Latchkey is working
         self.target = None     # the network it's looking for or joining
         self.failure = None    # (network, message) after a failed join
         self.failures = 0      # failed joins in a row
@@ -674,7 +668,7 @@ class WiFiFix(NSObject):
                         store.set_verified(ssid)
                 except Exception as e:
                     log("couldn't save the password:", e)
-                    ok, message = False, u"WiFiFix joined, but couldn't save the password in your keychain."
+                    ok, message = False, u"Latchkey joined, but couldn't save the password in your keychain."
             else:
                 log("couldn't join", q(ssid) + ":", code if error is None else repr(error))
                 self.failures += 1
@@ -690,9 +684,9 @@ class WiFiFix(NSObject):
         """(light, title, detail, busy) for the menu's status row."""
         s, names = self.status, self.store.networks()
         if not s.present:
-            return "gray", u"No Wi-Fi hardware", u"WiFiFix needs a Mac with Wi-Fi.", False
+            return "gray", u"No Wi-Fi hardware", u"Latchkey needs a Mac with Wi-Fi.", False
         if not s.power:
-            return "gray", u"Wi-Fi is off", u"WiFiFix rejoins your network once Wi-Fi is back on.", False
+            return "gray", u"Wi-Fi is off", u"Latchkey rejoins your network once Wi-Fi is back on.", False
         if self.phase == "join":
             return "amber", u"Joining %s…" % q(self.target), u"", True
         if self.phase == "search":
@@ -700,19 +694,19 @@ class WiFiFix(NSObject):
         if s.ssid:
             title = u"Connected to %s" % q(s.ssid)
             if s.ssid in names:
-                return "green", title, u"WiFiFix rejoins it if the connection drops.", False
+                return "green", title, u"Latchkey rejoins it if the connection drops.", False
             if names:
-                return "green", title, u"WiFiFix rejoins %s when this Mac isn't on any network." % names_text(names), False
-            return "green", title, u"Choose the network that Lion keeps losing, and WiFiFix will rejoin it for you.", False
+                return "green", title, u"Latchkey rejoins %s when this Mac isn't on any network." % names_text(names), False
+            return "green", title, u"Choose the network that Lion keeps losing, and Latchkey will rejoin it for you.", False
         when = in_words(max(0, self.next_try - time.time()))
         if self.failure:
-            return "orange", u"Couldn't join %s" % q(self.failure[0]), u"%s WiFiFix tries again %s." % (self.failure[1], when), False
+            return "orange", u"Couldn't join %s" % q(self.failure[0]), u"%s Latchkey tries again %s." % (self.failure[1], when), False
         if s.busy:
             return "amber", u"Lion is joining a network…", u"", True
         if names and self.away:
-            return "gray", u"Not connected", u"%s isn't in range. WiFiFix looks again %s." % (names_text(names), when), False
+            return "gray", u"Not connected", u"%s isn't in range. Latchkey looks again %s." % (names_text(names), when), False
         if names:
-            return "gray", u"Not connected", u"WiFiFix looks for %s %s." % (names_text(names), when), False
+            return "gray", u"Not connected", u"Latchkey looks for %s %s." % (names_text(names), when), False
         return "gray", u"Not connected", u"Choose a network to join it.", False
 
     def glyph(self, lit, highlighted, dim):
@@ -734,7 +728,7 @@ class WiFiFix(NSObject):
         self.item.setImage_(self.glyph(lit, False, dim))
         self.item.setAlternateImage_(self.glyph(lit, True, dim))
         light, title, detail, busy = self.describe()
-        self.item.setToolTip_(u"WiFiFix: %s" % title)
+        self.item.setToolTip_(u"Latchkey: %s" % title)
         self.header.show(light, title, detail, busy)
         if self.preview_header is not None:
             self.preview_header.show(light, title, detail, busy)
@@ -785,10 +779,6 @@ class WiFiFix(NSObject):
 
         if self.failure and self.failure[0] in names and s.power:
             self.add(m, u"Enter Password for %s…" % q(self.failure[0]), "enterPassword:", self.failure[0])
-        if s.ssid and s.ssid in names:
-            item = self.add(m, u"Rejoin %s Now" % q(s.ssid), "rejoinNow:", s.ssid)
-            item.setEnabled_(not self.phase)
-            item.setToolTip_(u"Disconnects for a moment and rejoins with the saved password.")
         self.add(m, u"Join Other Network…", "joinOther:").setEnabled_(bool(s.present and s.power))
         if names:
             forget = NSMenu.alloc().initWithTitle_(u"Forget Network")
@@ -796,13 +786,11 @@ class WiFiFix(NSObject):
                 self.add(forget, name, "forget:", name)
             m.addItemWithTitle_action_keyEquivalent_(u"Forget Network", None, u"").setSubmenu_(forget)
         m.addItem_(NSMenuItem.separatorItem())
-        if self.oldHelperInstalled():
-            self.add(m, u"Remove the Old wififix.sh Helper…", "removeOldHelper:")
         self.add(m, u"Open at Login", "toggleLogin:").setState_(NSOnState if self.login_items.enabled() else NSOffState)
         self.add(m, u"Open Network Preferences…", "openNetworkPreferences:")
         m.addItem_(NSMenuItem.separatorItem())
-        self.add(m, u"About WiFiFix", "about:")
-        self.add(m, u"Quit WiFiFix", "terminate:", None, u"q").setTarget_(NSApp)
+        self.add(m, u"About Latchkey", "about:")
+        self.add(m, u"Quit Latchkey", "terminate:", None, u"q").setTarget_(NSApp)
 
     def insertRows(self):
         nets = self.networks
@@ -822,7 +810,7 @@ class WiFiFix(NSObject):
             item.setEnabled_(n.joinable)
             if not n.joinable:
                 item.setToolTip_(u"Lion can't join networks that only offer WPA3." if n.kind == wifi.WPA3
-                                 else u"WiFiFix doesn't handle WPA2 Enterprise logins. Use the Wi-Fi menu.")
+                                 else u"Latchkey doesn't handle WPA2 Enterprise logins. Use the Wi-Fi menu.")
             self.menu.insertItem_atIndex_(item, at + i)
             self.rows.append(item)
 
@@ -894,15 +882,11 @@ class WiFiFix(NSObject):
     def joinOther_(self, sender):
         self.openPanel("other", None, None)
 
-    def rejoinNow_(self, sender):
-        if not self.phase:
-            self.join(sender.representedObject(), None, True, None)
-
     def forget_(self, sender):
         ssid = sender.representedObject()
         alert = NSAlert.alloc().init()
         alert.setMessageText_(u"Forget %s?" % q(ssid))
-        alert.setInformativeText_(u"WiFiFix will stop rejoining this network and remove its password from "
+        alert.setInformativeText_(u"Latchkey will stop rejoining this network and remove its password from "
                                   u"your keychain. Lion's own Wi-Fi settings stay as they are.")
         alert.addButtonWithTitle_(u"Forget")
         alert.addButtonWithTitle_(u"Cancel")
@@ -930,45 +914,6 @@ class WiFiFix(NSObject):
         NSApp.activateIgnoringOtherApps_(True)
         NSApp.orderFrontStandardAboutPanel_(None)
 
-    # ---- the old wififix.sh helper -------------------------------------------------------------
-    def oldHelperInstalled(self):
-        return self.defaults.boolForKey_("DemoOldHelper") if self.demo else os.path.exists(OLD_PLIST)
-
-    def removeOldHelper_(self, sender):
-        names = self.store.networks()
-        proven = [n for n in names if self.store.verified(n)]
-        alert = NSAlert.alloc().init()
-        alert.setMessageText_(u"Remove the old wififix.sh helper?")
-        tail = (u" Removing it also deletes the file where it kept your Wi-Fi password in plain text. "
-                u"WiFiFix keeps passwords in your keychain instead.")
-        if proven:
-            alert.setInformativeText_(u"WiFiFix has already rejoined %s by itself, so the old helper isn't "
-                                      u"needed anymore." % names_text(proven) + tail)
-            alert.addButtonWithTitle_(u"Remove")
-            alert.addButtonWithTitle_(u"Cancel")
-            remove = NSAlertFirstButtonReturn
-        elif names:
-            alert.setInformativeText_(u"WiFiFix hasn't rejoined %s yet, so the saved password isn't proven to "
-                                      u"work. Choose “Rejoin Now” in the WiFiFix menu first." % names_text(names) + tail)
-            alert.addButtonWithTitle_(u"Cancel")
-            alert.addButtonWithTitle_(u"Remove Anyway")
-            remove = NSAlertSecondButtonReturn
-        else:
-            alert.setInformativeText_(u"Choose your network in the WiFiFix menu and enter its password first. "
-                                      u"Otherwise nothing will rejoin it when the connection drops.")
-            alert.addButtonWithTitle_(u"OK")
-            remove = None
-        NSApp.activateIgnoringOtherApps_(True)
-        if alert.runModal() != remove or self.demo:
-            return
-        subprocess.call(["/bin/launchctl", "unload", OLD_PLIST], stdout=open(os.devnull, "w"), stderr=subprocess.STDOUT)
-        try:
-            os.remove(OLD_PLIST)
-            shutil.rmtree(OLD_DIR, ignore_errors=True)
-            log("removed the old wififix.sh helper")
-        except OSError as e:
-            log("couldn't remove the old helper:", e)
-
     # ---- the join dialog -----------------------------------------------------------------------
     def openPanel(self, mode, ssid, kind, activate=True):
         if self.panel is not None:
@@ -980,7 +925,7 @@ class WiFiFix(NSObject):
 
     def panelJoin(self, panel, ssid, password, kind):
         if self.phase:
-            panel.finished(False, u"WiFiFix is busy joining %s. Try again in a moment." % q(self.target or u"a network"))
+            panel.finished(False, u"Latchkey is busy joining %s. Try again in a moment." % q(self.target or u"a network"))
             return
         self.join(ssid, password, False, panel)
 
@@ -989,7 +934,7 @@ class WiFiFix(NSObject):
             self.store.remember(ssid, password)
         except Exception as e:
             log("couldn't save the password:", e)
-            panel.showError(u"WiFiFix couldn't save the password in your keychain.")
+            panel.showError(u"Latchkey couldn't save the password in your keychain.")
             return
         if panel.wantsLogin():
             self.setLoginItem(True)
@@ -1055,6 +1000,6 @@ class WiFiFix(NSObject):
 
 if __name__ == "__main__":
     app = NSApplication.sharedApplication()
-    delegate = WiFiFix.alloc().init()
+    delegate = Latchkey.alloc().init()
     app.setDelegate_(delegate)
     AppHelper.runEventLoop()

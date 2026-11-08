@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""WiFiFix's small pictures: the menu bar key, and the lock, signal fan and status lights in the menu.
+"""Latchkey's small pictures: the menu bar key, and the lock, signal fan and status lights in the menu.
 
 The menu bar glyph is a key whose bow is the Wi-Fi fan, so it reads differently from Lion's own
 Wi-Fi menu next to it. Lion's menu extras are near-black with a 1 px white emboss below, and pure

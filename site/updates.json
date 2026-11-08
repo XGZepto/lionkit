@@ -1,0 +1,14 @@
+{
+  "kassett": {
+    "version": "0.5",
+    "page": "https://github.com/XGZepto/lionkit/releases/tag/kassett-v0.5",
+    "dmg": "https://github.com/XGZepto/lionkit/releases/download/kassett-v0.5/Kassett-0.5.dmg",
+    "notes": "Kassett now looks like a cassette deck, has a library browser and an Up Next list, and keeps the small player as an option."
+  },
+  "planchette": {
+    "version": "0.4",
+    "page": "https://github.com/XGZepto/lionkit/releases/tag/planchette-v0.4",
+    "dmg": "https://github.com/XGZepto/lionkit/releases/download/planchette-v0.4/Planchette-0.4.dmg",
+    "notes": "Planchette now has full screen writing, a find bar, images you can drag in or paste, and scheduled posts."
+  }
+}

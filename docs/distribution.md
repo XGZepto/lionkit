@@ -72,21 +72,33 @@ tools/package.sh apps/Kassett      # → dist/Kassett-0.3.dmg and .zip
 3. `ditto -c -k --keepParent` for the zip (keeps the bundle and its symlinks intact).
 4. Copy both back to `dist/` on Linux, check them against the Mac's SHA-256 sums, and write
    `dist/SHA256SUMS`.
+
+The window was checked in Finder on the Mac (2026-11-08): the background, icon positions, window
+size and the app icon as the disk icon all come through, and "Read Me First" shows without its
+extension.
 5. Publish to **GitHub Releases** with `gh release create kassett-v0.3 dist/...`
    (tag per app: `<app-id>-v<version>`). Only with the user's go-ahead.
 
 ## Updates
 
-No Sparkle: Sparkle's networking would use Lion's TLS 1.0. Instead each app checks
-`https://xgzepto.github.io/lionkit/updates.json` through `lionkit.http` at most once a day:
+No Sparkle: Sparkle's networking would use Lion's TLS 1.0. Instead `lionkit/updates.py` reads
+`https://xgzepto.github.io/lionkit/updates.json` (published from `site/updates.json`) through
+`lionkit.http`:
 
 ```json
-{"kassett": {"version": "0.3", "url": "https://github.com/.../Kassett-0.3.dmg",
-                    "notes": "Cassette deck, library browser, device switching"}}
+{"kassett": {"version": "0.5",
+             "page": "https://github.com/XGZepto/lionkit/releases/tag/kassett-v0.5",
+             "dmg": "https://github.com/XGZepto/lionkit/releases/download/kassett-v0.5/Kassett-0.5.dmg",
+             "notes": "One or two plain sentences about what changed."}}
 ```
 
-If newer, a Lion-style sheet: "Kassett 0.3 is available — you have 0.2", release notes,
-**Download** (opens Momiji at the DMG) / **Not Now**. The site publishes `updates.json`.
+The key is the last part of the bundle id. `cocoa.build_main_menu` adds "Check for Updates…" under
+About in every app, so the apps don't need code of their own. Release builds also check by
+themselves 10 seconds after launch and then hourly, but at most once a day. A newer version shows
+a sheet ("A new version of Kassett is available.") with Download, which opens the release page in
+the default browser (or in Momiji when the default is Lion's Safari), and Not Now. An automatic
+check never interrupts another sheet. The `LionKitUpdatesURL` default points the check somewhere
+else for testing, including a `file://` path. Bump `site/updates.json` when a release is published.
 
 ## The website
 

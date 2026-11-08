@@ -15,9 +15,9 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 |---|---|---|
 | LionKit runtime: curl 8 + OpenSSL 3, dwebp, from MacPorts darwin_11 | — | works, trimmed to 14.5 MB |
 | `lionkit` library: http, keychain, ghost, spotify, markdown, html2md, cocoa, icons | — | works |
-| Planchette (Ghost blog editor) | 0.3 | in user testing |
+| Planchette (Ghost blog editor) | 0.4 | shipped; full screen, find bar, images, scheduling |
 | Kassett (Spotify Connect remote) | 0.2 | in user testing; cassette redesign mocked up |
-| WiFiFix (WPA2/WPA3 transition networks) | 0.1 | menu bar app built (demo-verified); the old script still runs the Mac |
+| Latchkey (WPA2/WPA3 transition networks) | 0.1 | in daily use on the Mac: joined ZipZap with its saved password, opens at login |
 | Dev tooling: deploy, launch (GUI session), shot, build_lionkit | — | works |
 
 ## Milestones
@@ -27,7 +27,7 @@ Status legend: `todo` · `in progress` · `review` (waiting on the user) · `don
 2. **Public beta**: anyone with a Lion Mac can download, open and update the apps from the
    website. (WS-5, WS-6)
 3. **Social**: a Mastodon + Bluesky client in the spirit of Tweetie. (WS-4)
-4. **Little joys**: Dashboard widgets, Wi-Fi fix for everyone, more apps from the backlog. (WS-3, WS-7)
+4. **Little joys**: Dashboard widgets, Latchkey for everyone, more apps from the backlog. (WS-3, WS-7)
 
 ## Current milestone: public beta 0.5
 
@@ -38,9 +38,9 @@ milestone is reached when all of these are true:
 - [ ] Kassett has the library browser from the mockups (Liked Songs, albums, artists, playlists,
       album and artist pages, search), and people outside the 25 allowlisted Spotify accounts can
       use their own Spotify app when login fails. (WS-1)
-- [ ] Planchette 0.4 is finished, including the bug where a two-line title hides the first line of
+- [x] Planchette 0.4 is finished, including the bug where a two-line title hides the first line of
       text under the divider. (WS-2)
-- [ ] Both apps check `updates.json` on the website once a day and offer new versions from a menu
+- [x] Both apps check `updates.json` on the website once a day and offer new versions from a menu
       item and a sheet. (WS-6)
 - [ ] The DMGs have been looked at in Finder, the right-click Open path works on a downloaded copy,
       and the site has download buttons pointing at the release. (WS-6)
@@ -134,39 +134,25 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** in progress (parked 2026-11-08) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** done · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
-Done on the branch (deployed to the Mac as 0.4, screenshot-checked unless noted):
-- Long titles wrap and the header grows; Return or Tab in the title moves into the text. The post's
-  path in the status line truncates in the middle instead of being clipped.
-- Converter version stored in each pulled post (`html2md.VERSION`); older clean copies re-pull.
-- Find bar (`setUsesFindBar_`) with Edit ▸ Find and Spelling and Grammar menus. *Find bar itself not
-  screenshotted yet.*
-- Lion full screen (View ▸ Enter Full Screen, ⌃⌘F): hides the post list, preview and inspector; the
-  toolbar auto-hides. *Not tried on the Mac: entering full screen would switch the user's Space.*
-- View ▸ Hide Post List (⌥⌘S). Sidebar width, preview split, preview/post list/inspector visibility,
-  and each post's scroll position and selection are remembered.
-- Drag and drop or paste images (files or picture data) into the editor → `media:` image lines,
-  uploaded on save. Paste was tested through a private pasteboard; real drags need the user.
-- Inspector: post address with a Copy button, Publish Date (schedule a draft, move a scheduled or
-  published post), feature image cropped like a post card that also takes drops, HUD-style buttons.
-  Publish… becomes Schedule…/Unschedule…; the site gets `status: scheduled` + `published_at`.
-  *Scheduling hasn't been run against the real site; ask before testing it there.*
-- Code and HTML-card shading has no gaps between lines; dates show in the Mac's time zone.
-- Hidden `DebugActions` default (see `runDebugActions_`) for screenshotting states over SSH.
+0.4 adds Lion full screen (the post list steps aside, the toolbar auto-hides), the find bar,
+images by drag and drop or paste, scheduling and moving publish dates from the inspector, a post
+address with Copy, a feature-image well that crops like a post card, remembered panes and per-post
+scroll positions, and a header that scrolls with the text. The post list and status line say a
+post's state once, through its group and one plain line.
 
-Next:
-- Ask the user to try full screen, a real drag from Finder, a pasted screenshot, the find bar, and
-  (with their go-ahead, on a throwaway draft) Schedule… → Unschedule….
-- Round-trip safety: compare `html2md` → `markdown.to_html` on every post (read-only, from inside the
-  app because the key needs the GUI keychain), and keep lossy blocks inside an HTML card. Watch image
-  cards with `kg-width-wide/full`, width/height and srcset.
-- Address preview for posts without a slug; maybe fold HTML cards into a compact token in the editor.
+Round trips are safe: `html2md` renders every block back and keeps anything that wouldn't come
+back the same as an HTML card; line breaks, Ghost-style quotes, captions with quotes and image
+sizes survive. On the 12 posts on the site the result is identical, with one block kept as a card.
+
+Ideas for later: fold HTML cards into a compact token in the editor; keep a link's `rel` in
+Markdown; a Ghost-style slug preview for non-Latin titles.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 
 ## WS-3 · Dashboard widgets
-**Status:** review (Forecast is waiting on the user's look in Dashboard; Now Playing is parked) · **Branch:** `ws/widgets` · **Owns:** `widgets/`, `tools/widget_preview.py`
+**Status:** review (Forecast 0.2 is on the Mac after the user's first look; Now Playing is parked) · **Branch:** `ws/widgets` · **Owns:** `widgets/`, `tools/widget_preview.py`
 
 - **Weather** in the style of Apple's widget (big temperature, condition art, 6-day strip) using
   Open-Meteo (no key). Dashboard's WebKit can't do modern TLS, so fetch through
@@ -176,7 +162,7 @@ Next:
 - Stretch: Hacker News top 10, a currency converter.
 
 Done (2026-11-08):
-- `widgets/Forecast.wdgt` 0.1 is Lion's Weather reimagined on Open-Meteo. It has a slate panel by
+- `widgets/Forecast.wdgt` (0.2) is Lion's Weather reimagined on Open-Meteo. It has a slate panel by
   day and plum by night, canvas-drawn condition art (the moon shows its real phase), a six-day strip
   that folds away on click, and a linen back with city search, °C/°F and Apple's info and Done
   buttons. The last forecast is cached in the widget's prefs so Dashboard never opens to a blank.
@@ -188,9 +174,12 @@ Done (2026-11-08):
   `~/Library/LionKitDev/com.apple.dashboard.plist.backup`.
 
 Next:
-- Get the user's screenshot of Forecast in Dashboard. Check the close-box position
-  (`CloseBoxInsetX/Y` 9/41), the flip, the fold animation and the window resizes, none of which the
-  preview can show. Ask whether Apple's broken Weather widget should come out of the layer.
+- The user has seen Forecast in Dashboard and likes the look and the animations. 0.2 makes the back
+  the same size as the open front (Done now sits in the info button's corner) and holds
+  `widget.system()` commands until they finish. That's the likely cause of one DashboardClient
+  crash (18:09, SIGSEGV in a WebKit GC pass), but it isn't confirmed; watch
+  `~/Library/Logs/DiagnosticReports/DashboardClient_*`. Still unchecked: the close-box position
+  (`CloseBoxInsetX/Y` 9/41), and whether Apple's broken Weather widget should leave the layer.
 - **Now Playing** (not started): follow Kassett's mini player (`design/kassett/project/Mini.dc.html`),
   with an aluminium bar, a small cassette whose reels turn while playing, the title in Marker Felt
   and the artist in Noteworthy (both ship with Lion), and prev/play/next buttons. Clicking the cassette
@@ -244,7 +233,7 @@ cells with badges, HUD helpers, LCD view, bottom-bar labels, textured toolbar fa
 copies moved out of the apps. Not before: it would collide with the app workstreams.
 
 ## WS-6 · Distribution & website
-**Status:** in progress (repo public, site live at https://xgzepto.github.io/lionkit/, packaging works) · **Branch:** `ws/distribution` · **Owns:** `site/`, `docs/distribution.md`, `tools/package.sh`, `.github/`
+**Status:** review (repo public, site live at https://xgzepto.github.io/lionkit/; 0.5 packaging, update check and downloads done) · **Branch:** `ws/distribution` · **Owns:** `site/`, `docs/distribution.md`, `tools/package.sh`, `.github/`
 
 Plan: `docs/distribution.md`.
 - ~~`tools/package.sh`~~ **done**: `tools/package.sh apps/Kassett apps/Planchette` builds
@@ -254,48 +243,51 @@ Plan: `docs/distribution.md`.
   Finder never opens a window. Tested from a temp folder on the Mac (zip and DMG copies, a fresh
   sandboxed home): both apps launch in the background, name themselves correctly, log nothing and
   quit cleanly; the read-only fallback runs as "Python".
-- **Not verified yet**: how Finder actually draws the DMG window (the `.DS_Store` parses and the
-  background alias resolves on the compressed image, but nobody has looked at the window), the
-  Gatekeeper right-click → Open path on a quarantined download, and the screenshot for the Read Me.
-  The Read Me also doesn't mention Spotify's 25-account limit yet (open question below).
-Remaining:
-- `updates.json` on the site + an update check in each app (via WS-5's http).
-- Site polish: real screenshots from the Mac (`tools/shot.py`, never with personal photos in view),
-  download buttons wired to Releases. `site/index.html`'s deck is
-  generated from `design/kassett/project/Main.dc.html`; regenerate it when the design changes.
+- ~~Update check~~ **done**: `lionkit/updates.py`, wired in through `cocoa.build_main_menu` ("Check
+  for Updates…" under About; release builds check daily on their own). `site/updates.json` lists
+  Kassett 0.5 and Planchette 0.4. Tested with a sandboxed release Kassett against a local
+  `updates.json`: the sheet appeared (its window and the recorded check prove it), but the Mac's
+  display was asleep, so there's no screenshot of it yet.
+- ~~DMG in Finder~~ **done**: opened on the Mac and captured; layout, background and disk icon are
+  right, and "Read Me First" now hides its extension. The Read Me mentions Spotify's 25-account limit.
+- ~~Download buttons~~ **done**: a Download section on the site points at
+  `releases/download/kassett-v0.5/Kassett-0.5.dmg` and `planchette-v0.4/Planchette-0.4.dmg`
+  (plus zips and release pages). They 404 until the release is published.
+- **Blocked on the user**: the right-click → Open path. This Mac has Gatekeeper set to "Anywhere"
+  (`spctl --status`: assessments disabled), so a quarantined copy opens without the dialog. The
+  test needs the setting back on "Mac App Store and identified developers" for a moment, which only
+  the user should change. The Read Me's screenshot of that step needs the user's clicks too.
+- **Next**: a screenshot of the update sheet when the display is awake; the site guide for using
+  your own Spotify app (the Read Me and the site promise one; WS-1 builds the in-app part).
 - Publishing: `.github/workflows/pages.yml` deploys `site/` once the repo is on GitHub with Pages
   set to "GitHub Actions".
 - Ask the user: repo name/visibility, license, and the Spotify public-build approach. **Never
   create the GitHub repo, push, or publish a release without their explicit go-ahead.**
 
 ## WS-7 · System fixes
-**Status:** review (WiFiFix 0.1 built, not yet tried on a real network) · **Branch:** `ws/system` · **Owns:** `system/`
+**Status:** review (Latchkey 0.1 built, not yet tried on a real network) · **Branch:** `ws/system` · **Owns:** `system/`
 
-- **WiFiFix for everyone**: Lion labels WPA2/WPA3 transition networks "WPA2 Enterprise" and won't
-  join them. Turn `system/WiFiFix/wififix.sh` into a small app with a menu-bar status item: pick
-  the network, enter the password once (keychain, not a file), see join status. Must run in the
-  GUI session.
+- **Latchkey for everyone**: Lion labels WPA2/WPA3 transition networks "WPA2 Enterprise" and won't
+  join them. Latchkey is a small app with a menu-bar status item: pick the network, enter the
+  password once (kept in the keychain), see join status. Must run in the GUI session.
 - A "Lion in 2026" setup guide on the site: Momiji, uBlock Origin, h264ify, which Apple
-  services to switch off, Wi-Fi fix, LionKit apps.
+  services to switch off, and the LionKit apps.
 
-Done (0.1, see `system/WiFiFix/README.md`): the menu bar app with a key-shaped status glyph
+Done (0.1, see `system/Latchkey/README.md`): the menu bar app with a key-shaped status glyph
 (signal, joining animation, off), a Lion-style network menu, a join dialog modelled on Lion's
-own, rejoin with back-off, passwords in the login keychain, Open at Login, Forget, "Rejoin Now",
-and a guided removal of the old helper. A brass-key app icon. Demo mode with made-up networks
+own, rejoin with back-off, passwords in the login keychain, Open at Login and Forget.
+A brass-key app icon. Demo mode with made-up networks
 for screenshots. `tools/deploy.sh` now builds `system/*` apps, and `tools/build_app.py` accepts
 extra Info.plist keys (`"info"` in app.json, used for `LSUIElement`).
 
 Verified on the Mac, in demo mode only: every dialog state, the custom menu rows, the status
 glyph in the menu bar, and the rejoin loop up to a failed join. The app is installed in
-/Applications but not running, and the old `local.wififix` agent is untouched.
+/Applications but not running.
 
 Next:
 - Nobody has opened the real menu yet. An open menu can't be captured over SSH, so the user
   needs to click it once (check row highlight, the scan on open, and how the menu resizes).
-- Joining for real is untested: the join code is the script's, but the real scan and the
-  join run only when the user acts. The user does the migration in the README's order.
 - "Open at Login" is untested (it adds a real login item). Reading the list works.
-- The site's Wi-Fi Fix card still shows the old glass-disc icon (WS-6).
 
 ---
 

@@ -27,7 +27,7 @@ your workstream, and `docs/design.md` before you draw a single pixel.
   account password anywhere. If something needs a password, ask the user to do that step.
 - Secrets live in the Mac's login keychain via `lionkit.keychain` (the `/usr/bin/security` CLI).
   Never write tokens to plain files, logs or the repo.
-- Don't read `~/Library/WiFiFix/config` on the Mac (it holds the Wi-Fi password).
+- Don't read files on the Mac that hold Wi-Fi or account passwords.
 - Don't commit personal data: no real SSIDs, emails or tokens in code, docs or screenshots.
 
 ## The loop
@@ -87,7 +87,7 @@ Networking and media:
 lionkit/          shared library (copied into every app bundle at build time)
 apps/<App>/       main.py + app.json {name, id, version} + icon.py (draws the icon with AppKit)
 widgets/          Dashboard widgets (.wdgt folders)
-system/           system-level fixes (WiFiFix)
+system/           system-level fixes (Latchkey)
 design/           HTML mockups: the visual spec for upcoming UI work
 site/             the public website (GitHub Pages, static HTML)
 docs/             design guide, distribution plan, notes

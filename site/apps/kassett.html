@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kassett 0.5 · LionKit Apps</title>
+<meta name="description" content="A remote for Spotify, drawn as a cassette deck.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Arimo:wght@400;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="store.css">
+</head>
+<body>
+<p class="back-home"><a href="../">‹ LionKit home</a></p>
+<div class="store">
+<div class="store-top">
+<div class="titlebar"><div class="lights" aria-hidden="true"><span></span><span></span><span></span></div><h1>LionKit Apps</h1></div>
+<nav class="toolbar" aria-label="Apps">
+<a class="tb-back" href="./" aria-label="Back to all apps"><svg width="8" height="11" viewBox="0 0 8 11" aria-hidden="true"><path d="M7 1 L2 5.5 L7 10" fill="none" stroke="#333" stroke-width="1.8"></path></svg></a>
+<div class="segmented">
+<a href="./">Featured</a>
+<a href="./#apps" aria-current="page">Apps</a>
+<a href="./#widgets">Widgets</a>
+</div>
+<span class="tb-spacer"></span>
+</nav>
+</div>
+
+<main class="product">
+<aside class="side">
+<img class="icon" src="../img/kassett-icon.png" alt="Kassett icon">
+<a class="price" href="https://github.com/XGZepto/lionkit/releases/download/kassett-v0.5/Kassett-0.5.dmg"><span class="idle">Free</span><span class="act">Download</span><span class="visually-hidden" style="position:absolute;left:-9999px">Kassett 0.5</span></a>
+<h2>Information</h2>
+<dl class="info">
+<div><dt>Category:</dt><dd>Music</dd></div>
+<div><dt>Updated:</dt><dd>November 8, 2026</dd></div>
+<div><dt>Version:</dt><dd>0.5</dd></div>
+<div><dt>Price:</dt><dd>Free</dd></div>
+<div><dt>Language:</dt><dd>English</dd></div>
+<div><dt>Developer:</dt><dd>XGZepto</dd></div>
+<div><dt>License:</dt><dd>MIT</dd></div>
+</dl>
+<h2>Requirements</h2>
+<p class="req">Mac OS X Lion 10.7.5 on an Intel Mac and a Spotify Premium account.</p>
+<h2>More from XGZepto</h2>
+<ul class="more-list">
+<li><img src="../img/planchette-icon.png" alt=""><a href="planchette.html">Planchette<span>Productivity</span></a></li>
+<li><img src="../img/latchkey-icon.png" alt=""><a href="latchkey.html">Latchkey<span>Utilities</span></a></li>
+<li><img src="../img/forecast-icon.svg" alt=""><a href="forecast.html">Forecast<span>Dashboard Widgets</span></a></li>
+</ul>
+</aside>
+<div class="main">
+<h1>Kassett</h1>
+<p class="by">By XGZepto · A remote for Spotify, drawn as a cassette deck.</p>
+<h2>Screenshots</h2>
+<div class="shots">
+<div class="shots-track">
+<figure><img src="../img/shots/kassett-deck.png" alt="The deck while a song plays" loading="lazy"><figcaption>The deck while a song plays</figcaption></figure>
+<figure><img src="../img/shots/kassett-library.png" alt="The library" loading="lazy"><figcaption>The library</figcaption></figure>
+<figure><img src="../img/shots/kassett-album.png" alt="An album" loading="lazy"><figcaption>An album</figcaption></figure>
+<figure><img src="../img/shots/kassett-search.png" alt="Search" loading="lazy"><figcaption>Search</figcaption></figure>
+<figure><img src="../img/shots/kassett-mini.png" alt="The mini player" loading="lazy"><figcaption>The mini player</figcaption></figure>
+</div>
+<button class="shots-nav prev" aria-label="Previous screenshot">‹</button><button class="shots-nav next" aria-label="Next screenshot">›</button>
+<div class="dots"><button aria-label="Screenshot 1"></button><button aria-label="Screenshot 2"></button><button aria-label="Screenshot 3"></button><button aria-label="Screenshot 4"></button><button aria-label="Screenshot 5"></button></div>
+</div>
+<h2>Description</h2>
+<p>Kassett is a remote for Spotify. The music keeps playing on your phone, speakers or TV, and Kassett shows it as a cassette turning in a tape deck.</p>
+<p>The Library key opens your Liked Songs, albums, artists and playlists in a window modelled on iTunes 10, with search and an Up Next list. A small player is there for when the deck takes up too much room.</p>
+<p>The name is Swedish for cassette, because Spotify started in Stockholm. 📼</p>
+<p class="note">You need Spotify Premium. Spotify lets only 25 accounts use an app like this until Spotify approves it, so if Kassett can&#x27;t log you in, it explains how to use your own free Spotify developer app instead.</p>
+<h2>What's New in Version 0.5</h2>
+<ul>
+<li>A cassette deck with turning reels, piano-key controls and a tape counter.</li>
+<li>A library browser for Liked Songs, albums, artists, playlists and search.</li>
+<li>Up Next, and Add to Up Next from any list.</li>
+<li>A mini player.</li>
+<li>If your account isn&#x27;t on Spotify&#x27;s list, you can log in with your own Spotify app.</li>
+</ul>
+</div>
+</main>
+<footer class="store-foot">Every LionKit app is free and open source under the MIT license. The source code is on <a href="https://github.com/XGZepto/lionkit">GitHub</a>. LionKit isn't affiliated with Apple, Spotify or the Ghost Foundation.</footer>
+</div>
+<script>
+(function () {
+  var track = document.querySelector('.shots-track');
+  if (!track) return;
+  var figs = track.querySelectorAll('figure'), dots = document.querySelectorAll('.dots button');
+  function current() { return Math.round(track.scrollLeft / track.clientWidth); }
+  function go(i) { i = Math.max(0, Math.min(figs.length - 1, i)); track.scrollTo({ left: i * track.clientWidth }); }
+  function mark() { var c = current(); dots.forEach(function (d, i) { d.setAttribute('aria-current', i === c ? 'true' : 'false'); }); }
+  document.querySelector('.shots-nav.prev').addEventListener('click', function () { go(current() - 1); });
+  document.querySelector('.shots-nav.next').addEventListener('click', function () { go(current() + 1); });
+  dots.forEach(function (d, i) { d.addEventListener('click', function () { go(i); }); });
+  track.addEventListener('scroll', function () { window.requestAnimationFrame(mark); });
+  mark();
+})();
+</script>
+</body>
+</html>

@@ -2,13 +2,15 @@
 """A small Markdown -> HTML converter (Python 2.7), tuned for Ghost posts.
 
 Supports: <!--kg-card-begin: html--> blocks (passed through), \\-escapes, # headings, paragraphs, **bold**, *italic*, `code`, [links](url), fenced ``` code blocks,
-> quotes, - / 1. lists, --- rules, and images on their own line:  ![alt](src "caption")
-which become Ghost image cards (<figure> with <figcaption>).
+> quotes, - / 1. lists, --- rules, a backslash at the end of a line for a line break, and images
+on their own line:  ![alt](src "caption")  which become Ghost image cards (<figure> with
+<figcaption>), with the width and height from `images` when they're known.
 """
 import cgi
 import re
 
-_IMG_LINE = re.compile(r'^!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)\s*$')
+_IMG_LINE = re.compile(r'^!\[([^\]]*)\]\((\S+?)(?:\s+"((?:[^"\\]|\\.)*)")?\)\s*$')  # caption may hold \"
+_ANY_IMG = re.compile(r'!\[([^\]]*)\]\((\S+?)(?:\s+"(?:[^"\\]|\\.)*")?\)')
 _INLINE_IMG = re.compile(r'!\[([^\]]*)\]\((\S+?)\)')
 _LINK = re.compile(r'\[([^\]]+)\]\((\S+?)\)')
 _BOLD = re.compile(r'\*\*(.+?)\*\*')
@@ -38,18 +40,44 @@ def inline(text):
     return re.sub("\x00(\\d+)\x00", lambda m: codes[int(m.group(1))], text)
 
 
+_BREAK = u"\x01"
+
+
+def join_lines(lines):
+    """A paragraph's lines joined with spaces, or with a line break where a line ends in an
+    unescaped backslash (marked with _BREAK until inline() has escaped the text)."""
+    out = []
+    for i, line in enumerate(lines):
+        line = line.strip()
+        if i < len(lines) - 1 and (len(line) - len(line.rstrip("\\"))) % 2 == 1:
+            out.append(line[:-1].rstrip() + _BREAK)
+        else:
+            out.append(line + (u" " if i < len(lines) - 1 else u""))
+    return u"".join(out)
+
+
+def inline_lines(lines):
+    return inline(join_lines(lines)).replace(_BREAK, "<br>")
+
+
 def image_srcs(md):
     """All image sources referenced in the document (for uploading local files)."""
-    return [m.group(2) for m in _INLINE_IMG.finditer(md)]
+    return [m.group(2) for m in _ANY_IMG.finditer(md)]  # with or without a caption
 
 
-def to_html(md):
+def to_html(md, images=None):
+    """`images` maps an image's src to its {"width", "height"}, so the site can make srcsets."""
     lines = md.replace("\r\n", "\n").split("\n")
     out, para, i = [], [], 0
+    images = images or {}
+
+    def size(src):
+        known = images.get(src) or {}
+        return "".join(' %s="%s"' % (k, known[k]) for k in ("width", "height") if known.get(k))
 
     def flush():
         if para:
-            out.append("<p>%s</p>" % inline(" ".join(l.strip() for l in para)))
+            out.append("<p>%s</p>" % inline_lines(para))
             del para[:]
 
     while i < len(lines):
@@ -86,16 +114,16 @@ def to_html(md):
         elif _IMG_LINE.match(stripped):
             flush()
             alt, src, caption = _IMG_LINE.match(stripped).groups()
-            cap = "<figcaption>%s</figcaption>" % inline(caption) if caption else ""
-            out.append('<figure class="kg-card kg-image-card%s"><img src="%s" class="kg-image" alt="%s">%s</figure>'
-                       % (" kg-card-hascaption" if caption else "", src, esc(alt), cap))
+            cap = "<figcaption>%s</figcaption>" % inline(caption.replace('\\"', '"')) if caption else ""
+            out.append('<figure class="kg-card kg-image-card%s"><img src="%s" class="kg-image" alt="%s"%s>%s</figure>'
+                       % (" kg-card-hascaption" if caption else "", src, esc(alt), size(src), cap))
         elif stripped.startswith(">"):
             flush()
             quote = []
             while i < len(lines) and lines[i].strip().startswith(">"):
                 quote.append(lines[i].strip()[1:].strip())
                 i += 1
-            out.append("<blockquote><p>%s</p></blockquote>" % inline(" ".join(quote)))
+            out.append("<blockquote>%s</blockquote>" % inline_lines(quote))  # as Ghost writes them
             continue
         elif re.match(r"^([-*+]|\d+\.)\s", stripped):
             flush()
