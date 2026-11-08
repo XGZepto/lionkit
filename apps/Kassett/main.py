@@ -93,7 +93,7 @@ class AppDelegate(NSObject):
         art.shared()
         self.buildMenus()
         self.deck = deck.Deck.alloc().initWithApp_(self)
-        self.deck.cassette.shell = self.defaults.stringForKey_("CassetteShell") or "black"
+        self.deck.cassette.shell = self.defaults.stringForKey_("CassetteShell") or "clear"
         self.mini = deck.Mini.alloc().initWithApp_(self)
         self.upnext = upnext.UpNext.alloc().initWithApp_(self)
         for w in (self.deck.window, self.mini.window):
@@ -123,7 +123,7 @@ class AppDelegate(NSObject):
         view = main.itemWithTitle_("View").submenu()
         shells = view.addItemWithTitle_action_keyEquivalent_(u"Cassette", None, "")
         sub = NSMenu.alloc().initWithTitle_(u"Cassette")
-        for title, key in ((u"Black", "black"), (u"Smoke", "smoke"), (u"White", "white")):
+        for title, key in ((u"Clear", "clear"), (u"Black", "black"), (u"Smoke", "smoke"), (u"White", "white")):
             it = sub.addItemWithTitle_action_keyEquivalent_(title, "setShell:", "")
             it.setRepresentedObject_(key)
             it.setTarget_(self)
@@ -451,11 +451,11 @@ class AppDelegate(NSObject):
 
     def volumeUp_(self, sender):
         if self.volume() is not None:
-            self.deck.knob.change(self.volume() + 8, True)
+            self.deck.wheel.change(self.volume() + 8, True)
 
     def volumeDown_(self, sender):
         if self.volume() is not None:
-            self.deck.knob.change(self.volume() - 8, True)
+            self.deck.wheel.change(self.volume() - 8, True)
 
     def handleKey(self, event):
         """Keys the deck and the library share: space plays or pauses, arrows skip."""
