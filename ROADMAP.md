@@ -100,34 +100,26 @@ current docs and design around what's available. Playback control needs Premium.
 against the user's account (ask them to click through), and memory stays under ~120 MB.
 
 ## WS-2 · Planchette 0.4
-**Status:** in progress (parked 2026-11-08) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
+**Status:** review (waiting on the user for three checks) · **Branch:** `ws/planchette` · **Owns:** `apps/Planchette`, `lionkit/ghost.py`, `lionkit/markdown.py`, `lionkit/html2md.py`
 
-Done on the branch (deployed to the Mac as 0.4, screenshot-checked unless noted):
-- Long titles wrap and the header grows; Return or Tab in the title moves into the text. The post's
-  path in the status line truncates in the middle instead of being clipped.
-- Converter version stored in each pulled post (`html2md.VERSION`); older clean copies re-pull.
-- Find bar (`setUsesFindBar_`) with Edit ▸ Find and Spelling and Grammar menus. *Find bar itself not
-  screenshotted yet.*
-- Lion full screen (View ▸ Enter Full Screen, ⌃⌘F): hides the post list, preview and inspector; the
-  toolbar auto-hides. *Not tried on the Mac: entering full screen would switch the user's Space.*
-- View ▸ Hide Post List (⌥⌘S). Sidebar width, preview split, preview/post list/inspector visibility,
-  and each post's scroll position and selection are remembered.
-- Drag and drop or paste images (files or picture data) into the editor → `media:` image lines,
-  uploaded on save. Paste was tested through a private pasteboard; real drags need the user.
-- Inspector: post address with a Copy button, Publish Date (schedule a draft, move a scheduled or
-  published post), feature image cropped like a post card that also takes drops, HUD-style buttons.
-  Publish… becomes Schedule…/Unschedule…; the site gets `status: scheduled` + `published_at`.
-  *Scheduling hasn't been run against the real site; ask before testing it there.*
-- Code and HTML-card shading has no gaps between lines; dates show in the Mac's time zone.
-- Hidden `DebugActions` default (see `runDebugActions_`) for screenshotting states over SSH.
+Done and checked on the Mac (screenshots, or the app's own snapshot while the screen was locked):
+- The status line, title and rule scroll with the text, so a long title never hides the first line
+  and no fixed edge sits over the writing. Restoring a post's place lays out the whole post first.
+- Quieter status: no dots or counts in the post list, no pill above the title (one line instead,
+  e.g. "Published November 8, 2026"), and the preview shows the date and tags a reader sees.
+- Round-trip safety: every block is converted, rendered back and compared (`html2md.same_html`);
+  anything that wouldn't come back the same stays as an HTML card. On all 12 posts on the site the
+  result is identical, with 2 blocks kept as cards. Line breaks (backslash at line end) and
+  Ghost-style quotes are supported; image widths and heights are kept per post and sent on save.
+  `html2md.VERSION` is 3, so clean copies re-pull.
+- Find bar (⌘F, ⌥⌘F with Replace), the focus layout used in full screen, image paste (files and
+  pictures), the inspector (address with Copy, feature image well that takes drops).
 
-Next:
-- Ask the user to try full screen, a real drag from Finder, a pasted screenshot, the find bar, and
-  (with their go-ahead, on a throwaway draft) Schedule… → Unschedule….
-- Round-trip safety: compare `html2md` → `markdown.to_html` on every post (read-only, from inside the
-  app because the key needs the GUI keychain), and keep lossy blocks inside an HTML card. Watch image
-  cards with `kg-width-wide/full`, width/height and srcset.
-- Address preview for posts without a slug; maybe fold HTML cards into a compact token in the editor.
+Waiting on the user:
+- Try real full screen (⌃⌘F) and a real drag from Finder; neither can be done over SSH.
+- Scheduling is built but switched off (`defaults write page.zepto.planchette EnableScheduling -bool
+  YES` shows it) because testing it needs a throwaway post on the real site. With the user's
+  go-ahead: create a draft, schedule it for a far-off date, unschedule it, delete it, then turn it on.
 
 **Done when:** the user can write, illustrate, schedule and publish a post without opening Ghost Admin.
 
