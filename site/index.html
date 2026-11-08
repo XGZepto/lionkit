@@ -121,6 +121,13 @@ h2 { margin: 0 0 6px; font: 600 clamp(28px, 4vw, 36px)/1.15 var(--display); lett
 .pill.amber { background: linear-gradient(180deg, #f2b44c, #d68512); }
 .pill.gray { background: linear-gradient(180deg, #a5a5a5, #7a7a7a); }
 
+.downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.downloads .app { margin: 0; padding: 22px; gap: 18px; flex-wrap: nowrap; }
+.downloads .icon { width: 72px; height: 72px; }
+.downloads h3 { font-size: 22px; }
+.downloads .btn { margin-top: 12px; }
+.downloads .other { margin: 8px 0 0; font-size: 12px; }
+
 .soon { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 .soon div {
   padding: 18px 20px; border-radius: 8px; background: var(--mist);
@@ -177,6 +184,7 @@ footer p { margin: 4px 0; }
 <li class="home"><a href="#top"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="10" r="4.2" fill="#ffffff"></circle><circle cx="3" cy="5.2" r="1.9" fill="#ffffff"></circle><circle cx="6.3" cy="2.6" r="1.9" fill="#ffffff"></circle><circle cx="9.7" cy="2.6" r="1.9" fill="#ffffff"></circle><circle cx="13" cy="5.2" r="1.9" fill="#ffffff"></circle></svg>LionKit</a></li>
 <li><a href="#apps">Apps</a></li>
 <li><a href="#start">Get Started</a></li>
+<li><a href="#download">Download</a></li>
 <li><a href="#hood">How It Works</a></li>
 <li><a href="#story">The Story</a></li>
 <li><a href="https://github.com/XGZepto/lionkit">GitHub</a></li>
@@ -191,7 +199,7 @@ footer p { margin: 4px 0; }
 <a class="btn" href="#start">Get Started</a>
 <a class="btn plain" href="https://zepto.page/bringing-lion-back/">Read the story ›</a>
 </div>
-<p class="fine">The apps need Mac OS X Lion 10.7.5 on an Intel Mac. I'll post downloads here once the first beta is ready.</p>
+<p class="fine">The apps need Mac OS X Lion 10.7.5 on an Intel Mac. The first public beta is <a href="#download">ready to download</a>.</p>
 </div>
 
 <div class="mba" role="img" aria-label="A MacBook Air running Mac OS X Lion, with Planchette open on the desktop">
@@ -418,6 +426,33 @@ footer p { margin: 4px 0; }
 <div class="step"><b>Get a modern browser</b><p>Safari on Lion only supports TLS 1.0, and almost every website needs something newer, including this one. <a href="https://github.com/aobaharuki2005/momiji-web-browser">Momiji</a> is a Firefox-based browser that still supports Lion, so install it first.</p></div>
 <div class="step"><b>Download an app</b><p>Each app comes as a single download that already contains the networking code it needs. Drag it into your Applications folder.</p></div>
 <div class="step"><b>Open it with a right-click the first time</b><p>The apps aren't signed by Apple, so Gatekeeper stops them the first time you open them. Control-click the app, choose Open, and then click Open again. After that it opens normally.</p></div>
+</div>
+</div>
+</section>
+
+<section id="download">
+<div class="wrap">
+<h2>Download</h2>
+<p class="sub">These are beta versions. Each app tells you when a newer one is out, and you can also choose Check for Updates from its app menu.</p>
+<div class="downloads">
+<div class="app">
+<img class="icon" src="img/kassett-icon.png" alt="">
+<div class="text">
+<h3>Kassett 0.5</h3>
+<p>Kassett works with Spotify Premium. Spotify only lets 25 hand-picked accounts sign in through my copy of Kassett, so you may need to create your own free Spotify app and give Kassett its Client ID.</p>
+<a class="btn" href="https://github.com/XGZepto/lionkit/releases/download/kassett-v0.5/Kassett-0.5.dmg">Download Kassett</a>
+<p class="other">You can also get the <a href="https://github.com/XGZepto/lionkit/releases/download/kassett-v0.5/Kassett-0.5.zip">zip file</a> or read the <a href="https://github.com/XGZepto/lionkit/releases/tag/kassett-v0.5">release notes</a>.</p>
+</div>
+</div>
+<div class="app">
+<img class="icon" src="img/planchette-icon.png" alt="">
+<div class="text">
+<h3>Planchette 0.4</h3>
+<p>Planchette works with blogs that run on Ghost. You'll need an Admin API key, which you can create in Ghost Admin under Settings, then Integrations.</p>
+<a class="btn" href="https://github.com/XGZepto/lionkit/releases/download/planchette-v0.4/Planchette-0.4.dmg">Download Planchette</a>
+<p class="other">You can also get the <a href="https://github.com/XGZepto/lionkit/releases/download/planchette-v0.4/Planchette-0.4.zip">zip file</a> or read the <a href="https://github.com/XGZepto/lionkit/releases/tag/planchette-v0.4">release notes</a>.</p>
+</div>
+</div>
 </div>
 </div>
 </section>

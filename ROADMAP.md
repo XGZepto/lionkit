@@ -40,7 +40,7 @@ milestone is reached when all of these are true:
       use their own Spotify app when login fails. (WS-1)
 - [x] Planchette 0.4 is finished, including the bug where a two-line title hides the first line of
       text under the divider. (WS-2)
-- [ ] Both apps check `updates.json` on the website once a day and offer new versions from a menu
+- [x] Both apps check `updates.json` on the website once a day and offer new versions from a menu
       item and a sheet. (WS-6)
 - [ ] The DMGs have been looked at in Finder, the right-click Open path works on a downloaded copy,
       and the site has download buttons pointing at the release. (WS-6)
@@ -199,7 +199,7 @@ cells with badges, HUD helpers, LCD view, bottom-bar labels, textured toolbar fa
 copies moved out of the apps. Not before: it would collide with the app workstreams.
 
 ## WS-6 · Distribution & website
-**Status:** in progress (repo public, site live at https://xgzepto.github.io/lionkit/, packaging works) · **Branch:** `ws/distribution` · **Owns:** `site/`, `docs/distribution.md`, `tools/package.sh`, `.github/`
+**Status:** review (repo public, site live at https://xgzepto.github.io/lionkit/; 0.5 packaging, update check and downloads done) · **Branch:** `ws/distribution` · **Owns:** `site/`, `docs/distribution.md`, `tools/package.sh`, `.github/`
 
 Plan: `docs/distribution.md`.
 - ~~`tools/package.sh`~~ **done**: `tools/package.sh apps/Kassett apps/Planchette` builds
@@ -209,15 +209,22 @@ Plan: `docs/distribution.md`.
   Finder never opens a window. Tested from a temp folder on the Mac (zip and DMG copies, a fresh
   sandboxed home): both apps launch in the background, name themselves correctly, log nothing and
   quit cleanly; the read-only fallback runs as "Python".
-- **Not verified yet**: how Finder actually draws the DMG window (the `.DS_Store` parses and the
-  background alias resolves on the compressed image, but nobody has looked at the window), the
-  Gatekeeper right-click → Open path on a quarantined download, and the screenshot for the Read Me.
-  The Read Me also doesn't mention Spotify's 25-account limit yet (open question below).
-Remaining:
-- `updates.json` on the site + an update check in each app (via WS-5's http).
-- Site polish: real screenshots from the Mac (`tools/shot.py`, never with personal photos in view),
-  download buttons wired to Releases. `site/index.html`'s deck is
-  generated from `design/kassett/project/Main.dc.html`; regenerate it when the design changes.
+- ~~Update check~~ **done**: `lionkit/updates.py`, wired in through `cocoa.build_main_menu` ("Check
+  for Updates…" under About; release builds check daily on their own). `site/updates.json` lists
+  Kassett 0.5 and Planchette 0.4. Tested with a sandboxed release Kassett against a local
+  `updates.json`: the sheet appeared (its window and the recorded check prove it), but the Mac's
+  display was asleep, so there's no screenshot of it yet.
+- ~~DMG in Finder~~ **done**: opened on the Mac and captured; layout, background and disk icon are
+  right, and "Read Me First" now hides its extension. The Read Me mentions Spotify's 25-account limit.
+- ~~Download buttons~~ **done**: a Download section on the site points at
+  `releases/download/kassett-v0.5/Kassett-0.5.dmg` and `planchette-v0.4/Planchette-0.4.dmg`
+  (plus zips and release pages). They 404 until the release is published.
+- **Blocked on the user**: the right-click → Open path. This Mac has Gatekeeper set to "Anywhere"
+  (`spctl --status`: assessments disabled), so a quarantined copy opens without the dialog. The
+  test needs the setting back on "Mac App Store and identified developers" for a moment, which only
+  the user should change. The Read Me's screenshot of that step needs the user's clicks too.
+- **Next**: a screenshot of the update sheet when the display is awake; the site guide for using
+  your own Spotify app (the Read Me and the site promise one; WS-1 builds the in-app part).
 - Publishing: `.github/workflows/pages.yml` deploys `site/` once the repo is on GitHub with Pages
   set to "GitHub Actions".
 - Ask the user: repo name/visibility, license, and the Spotify public-build approach. **Never
